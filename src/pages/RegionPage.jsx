@@ -278,9 +278,9 @@ export default function RegionPage() {
       });
       map.on('click', 'region-fill', e => {
         const iso = e.features[0].properties.ISO_A3;
-        // Map territory aliases back to canonical ISO (e.g. SOL → SOM)
+        // Only alias back to canonical if the alias itself is not a direct region member
         const ALIAS_TO_CANON = { SOL: 'SOM', SDS: 'SDN' };
-        const canonIso = ALIAS_TO_CANON[iso] || iso;
+        const canonIso = (!isos.includes(iso) && ALIAS_TO_CANON[iso]) || iso;
         if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
       });
     });
