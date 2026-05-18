@@ -60,19 +60,27 @@ export default function CountryPage() {
   const [subsOn,       setSubsOn]       = useState(true);
   const [minMw,        setMinMw]        = useState(100);
   const [circleScale,  setCircleScale]  = useState(1.0);
-  const [plantSource,  setPlantSource]  = useState('osm');
+  const [plantSource,   setPlantSource]   = useState('osm');
+  const [gppdAvailable, setGppdAvailable] = useState(null);
   const countryFeatureRef = useRef(null);
 
   useEffect(() => {
     fetch('/data/regions.json').then(r => r.json()).then(d => {
       for (const region of (d.regions || [])) {
         const country = region.countries.find(c => c.iso === iso);
-        if (country) { setInfo({ country, region }); return; }
+        if (country) {
+          setInfo({ country, region });
+          // Check GPPD availability for this region
+          fetch(`/data/cache/region_plants_${region.id}_gppd.geojson`, { method: 'HEAD' })
+            .then(r => setGppdAvailable(r.ok))
+            .catch(() => setGppdAvailable(false));
+          return;
+        }
       }
     });
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
-    setPlantSource('osm'); countryFeatureRef.current = null;
+    setPlantSource('osm'); setGppdAvailable(null); countryFeatureRef.current = null;
   }, [iso]);
 
   useEffect(() => {
@@ -357,7 +365,9 @@ export default function CountryPage() {
         const fuels = new Set(filtered.features.map(f => f.properties.fuel).filter(f => FUEL_COLORS[f]));
         setPresentFuels(fuels);
       })
-      .catch(() => plantSource !== 'osm' && setPlantSource('osm'));
+      .catch(() => {
+        if (plantSource !== 'osm') { setGppdAvailable(false); setPlantSource('osm'); }
+      });
   }, [plantSource, info]);
 
   if (!info) return <div style={{ padding: 40, color: t.text }}>Loading…</div>;
@@ -371,7 +381,7 @@ export default function CountryPage() {
         fuelsOff={fuelsOff} kvsOff={kvsOff}
         linesOn={linesOn} plantsOn={plantsOn} subsOn={subsOn}
         minMw={minMw} circleScale={circleScale}
-        plantSource={plantSource}
+        plantSource={plantSource} gppdAvailable={gppdAvailable}
         presentFuels={presentFuels}
         onToggleFuel={toggleFuel} onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}

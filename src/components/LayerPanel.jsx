@@ -3,7 +3,7 @@ import { FUEL_COLORS, FUEL_LABELS, VOLTAGE_BRACKETS, getT } from '../constants';
 export default function LayerPanel({
   theme,
   fuelsOff, kvsOff, linesOn, plantsOn, subsOn, minMw, circleScale,
-  plantSource,
+  plantSource, gppdAvailable,
   presentFuels,
   onToggleFuel, onToggleKv, onToggleLines, onTogglePlants, onToggleSubs,
   onMinMwChange, onCircleScaleChange, onSourceChange,
@@ -57,16 +57,25 @@ export default function LayerPanel({
       {onSourceChange && (
         <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
           {['osm', 'gppd'].map(src => {
-            const active = plantSource === src;
+            const active    = plantSource === src;
+            const disabled  = src === 'gppd' && gppdAvailable === false;
+            const checking  = src === 'gppd' && gppdAvailable === null;
             return (
-              <button key={src} onClick={() => onSourceChange(src)} style={{
-                flex: 1, fontSize: '0.5rem', letterSpacing: '1px',
-                textTransform: 'uppercase', fontFamily: 'inherit',
-                padding: '2px 0', borderRadius: 3, cursor: 'pointer',
-                border: `1px solid ${active ? 'rgba(128,160,192,0.6)' : 'rgba(128,160,192,0.18)'}`,
-                backgroundColor: active ? 'rgba(128,160,192,0.15)' : 'transparent',
-                color: active ? t.lbl : t.lblMuted,
-              }}>
+              <button
+                key={src}
+                onClick={() => !disabled && onSourceChange(src)}
+                title={disabled ? 'GPPD data not available — run prepare_gppd.py' : checking ? 'Checking…' : undefined}
+                style={{
+                  flex: 1, fontSize: '0.5rem', letterSpacing: '1px',
+                  textTransform: 'uppercase', fontFamily: 'inherit',
+                  padding: '2px 0', borderRadius: 3,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  border: `1px solid ${active ? 'rgba(128,160,192,0.6)' : 'rgba(128,160,192,0.18)'}`,
+                  backgroundColor: active ? 'rgba(128,160,192,0.15)' : 'transparent',
+                  color: active ? t.lbl : t.lblMuted,
+                  opacity: disabled ? 0.35 : checking ? 0.6 : 1,
+                }}
+              >
                 {src === 'gppd' ? 'GPPD (WRI)' : 'OSM'}
               </button>
             );

@@ -39,32 +39,55 @@ export default function RegionPage() {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
 
-  const [region,       setRegion]       = useState(null);
-  const [capacity,     setCapacity]     = useState(null);
-  const [presentFuels, setPresentFuels] = useState(new Set());
-  const [fuelsOff,     setFuelsOff]     = useState(new Set());
-  const [kvsOff,       setKvsOff]       = useState(new Set());
-  const [linesOn,      setLinesOn]      = useState(true);
-  const [plantsOn,     setPlantsOn]     = useState(true);
-  const [subsOn,       setSubsOn]       = useState(true);
-  const [minMw,        setMinMw]        = useState(100);
-  const [circleScale,  setCircleScale]  = useState(1.0);
-  const [plantSource,  setPlantSource]  = useState('osm');
-  const [activeTab,    setActiveTab]    = useState('overview');
+  const [region,        setRegion]       = useState(null);
+  const [capacity,      setCapacity]     = useState(null);
+  const [tariffs,       setTariffs]      = useState(null);
+  const [fleetAge,      setFleetAge]     = useState(null);
+  const [gppdAvailable, setGppdAvailable] = useState(null);
+  const [presentFuels,  setPresentFuels] = useState(new Set());
+  const [fuelsOff,      setFuelsOff]     = useState(new Set());
+  const [kvsOff,        setKvsOff]       = useState(new Set());
+  const [linesOn,       setLinesOn]      = useState(true);
+  const [plantsOn,      setPlantsOn]     = useState(true);
+  const [subsOn,        setSubsOn]       = useState(true);
+  const [minMw,         setMinMw]        = useState(100);
+  const [circleScale,   setCircleScale]  = useState(1.0);
+  const [plantSource,   setPlantSource]  = useState('osm');
+  const [activeTab,     setActiveTab]    = useState('overview');
 
-  // Load region metadata
+  // Static tariffs — fetch once
+  useEffect(() => {
+    fetch('/data/tariffs.json').then(r => r.json()).then(setTariffs).catch(() => {});
+  }, []);
+
+  // Load region metadata + check GPPD availability
   useEffect(() => {
     fetch('/data/regions.json').then(r => r.json()).then(d => {
       const r = (d.regions || []).find(r => r.id === regionId);
       setRegion(r || null);
     });
-    setCapacity(null);
+    setCapacity(null); setFleetAge(null);
     fetch(`/data/cache/region_capacity_${regionId}.json`).then(r => r.json()).then(setCapacity).catch(() => {});
     // Reset layer state on region change
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
+    // Check whether GPPD files exist for this region
+    setGppdAvailable(null);
+    fetch(`/data/cache/region_plants_${regionId}_gppd.geojson`, { method: 'HEAD' })
+      .then(r => setGppdAvailable(r.ok))
+      .catch(() => setGppdAvailable(false));
   }, [regionId]);
+
+  // Fleet age — load only when GPPD source is active
+  useEffect(() => {
+    setFleetAge(null);
+    if (plantSource !== 'gppd') return;
+    fetch(`/data/cache/region_age_${regionId}_gppd.json`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setFleetAge)
+      .catch(() => setFleetAge(null));
+  }, [plantSource, regionId]);
 
   // Initialise map
   useEffect(() => {
@@ -360,8 +383,10 @@ export default function RegionPage() {
         return fetch(`/data/cache/${cf}`).then(r => r.json());
       })
       .then(setCapacity)
-      .catch(() => plantSource !== 'osm' && setPlantSource('osm'));
-  }, [plantSource]);
+      .catch(() => {
+        if (plantSource !== 'osm') { setGppdAvailable(false); setPlantSource('osm'); }
+      });
+  }, [plantSource, regionId]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -376,7 +401,7 @@ export default function RegionPage() {
         fuelsOff={fuelsOff} kvsOff={kvsOff}
         linesOn={linesOn} plantsOn={plantsOn} subsOn={subsOn}
         minMw={minMw} circleScale={circleScale}
-        plantSource={plantSource}
+        plantSource={plantSource} gppdAvailable={gppdAvailable}
         presentFuels={presentFuels}
         onToggleFuel={toggleFuel} onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
@@ -419,7 +444,7 @@ export default function RegionPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
-          {['Overview', 'Stats'].map(tab => {
+          {['Overview', 'Countries'].map(tab => {
             const active = activeTab === tab.toLowerCase();
             return (
               <button key={tab} onClick={() => setActiveTab(tab.toLowerCase())} style={{
@@ -437,8 +462,8 @@ export default function RegionPage() {
           })}
         </div>
 
-        {activeTab === 'overview' && <CapacityChart capacity={capacity} region={region} theme={theme} source={plantSource} />}
-        {activeTab === 'stats'    && <StatsPanel    capacity={capacity} region={region} theme={theme} source={plantSource} />}
+        {activeTab === 'overview'   && <CapacityChart capacity={capacity} region={region} theme={theme} source={plantSource} tariffs={tariffs} />}
+        {activeTab === 'countries' && <StatsPanel    capacity={capacity} region={region} theme={theme} source={plantSource} tariffs={tariffs} fleetAge={fleetAge} />}
       </div>
     </div>
   );
