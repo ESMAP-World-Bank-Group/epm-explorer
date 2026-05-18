@@ -198,30 +198,34 @@ export default function CapacityChart({ capacity, region, theme, source = 'osm',
         </div>
       )}
 
-      {/* ── Access range ──────────────────────── */}
-      {aMin !== null && (
-        <div style={{ marginBottom: 8 }}>
-          <span style={sec}>Electricity Access · Total Population</span>
-          <div style={{
-            height: 6, borderRadius: 3,
-            background: 'linear-gradient(90deg, #F03E3E, #FCC419, #40C057)',
-            marginBottom: 6,
-          }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#F03E3E' }}>{aMin}%</span>
-              <span style={{ fontSize: '0.5rem', color: t.lblMuted, marginLeft: 3 }}>{aMinIso}</span>
-            </span>
-            <span>
-              <span style={{ fontSize: '0.5rem', color: t.lblMuted, marginRight: 3 }}>{aMaxIso}</span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#40C057' }}>{aMax}%</span>
-            </span>
+      {/* ── Access — regional average ─────────── */}
+      {aMin !== null && (() => {
+        const vals = region.countries.map(c => access.countries?.[c.iso]?.total).filter(v => v != null);
+        const avg = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+        const color = avg < 30 ? '#F03E3E' : avg < 75 ? '#FCC419' : '#40C057';
+        return (
+          <div style={{ marginBottom: 8 }}>
+            <span style={sec}>Electricity Access · Regional Avg</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, height: 7, borderRadius: 3, backgroundColor: 'rgba(128,160,192,0.12)', overflow: 'hidden' }}>
+                <div style={{ width: `${avg}%`, height: '100%', backgroundColor: color, borderRadius: 3, opacity: 0.85 }} />
+              </div>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color, minWidth: 38, textAlign: 'right' }}>{avg}%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontSize: '0.55rem', color: t.lblMuted }}>
+                Lowest: {aMinIso} {aMin}%
+              </span>
+              <span style={{ fontSize: '0.55rem', color: t.lblMuted }}>
+                of total population
+              </span>
+            </div>
+            <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 4, fontStyle: 'italic' }}>
+              World Bank / SE4All · {access.year}
+            </p>
           </div>
-          <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic' }}>
-            World Bank / SE4All · {access.year}
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Source attribution ────────────────── */}
       <p style={{ fontSize: '0.52rem', color: t.lblMuted, marginTop: 4, fontStyle: 'italic' }}>

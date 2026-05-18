@@ -157,7 +157,7 @@ export default function StatsPanel({ capacity, region, theme, source = 'osm', ta
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {withAccess.map(c => {
                 const val = access.countries[c.iso].total;
-                const color = val < 50 ? '#F03E3E' : val < 90 ? '#FCC419' : '#40C057';
+                const color = val < 30 ? '#F03E3E' : val < 75 ? '#FCC419' : '#40C057';
                 return (
                   <div key={c.iso}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>

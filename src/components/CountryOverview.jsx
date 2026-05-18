@@ -19,7 +19,7 @@ function KpiCard({ label, value, accent, t }) {
 }
 
 function accessColor(val) {
-  return val < 50 ? '#F03E3E' : val < 90 ? '#FCC419' : '#40C057';
+  return val < 30 ? '#F03E3E' : val < 75 ? '#FCC419' : '#40C057';
 }
 
 export default function CountryOverview({ iso, region, capacity, fleetAge, tariffs, access, theme, source = 'osm' }) {
