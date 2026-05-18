@@ -60,6 +60,8 @@ export default function CountryPage() {
   const [subsOn,       setSubsOn]       = useState(true);
   const [minMw,        setMinMw]        = useState(100);
   const [circleScale,  setCircleScale]  = useState(1.0);
+  const [plantSource,  setPlantSource]  = useState('osm');
+  const countryFeatureRef = useRef(null);
 
   useEffect(() => {
     fetch('/data/regions.json').then(r => r.json()).then(d => {
@@ -70,6 +72,7 @@ export default function CountryPage() {
     });
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
+    setPlantSource('osm'); countryFeatureRef.current = null;
   }, [iso]);
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export default function CountryPage() {
       // Filter plants strictly inside the country polygon (point-in-polygon)
       // Lines filtered by bbox (segments cross borders by nature)
       const countryFeature = countries.features.find(f => f.properties.ISO_A3 === iso);
+      countryFeatureRef.current = countryFeature || null;
       let filteredPlants = plantsGJ;
       let filteredLines  = linesGJ;
       let filteredSubs   = subsGJ;
@@ -334,6 +338,28 @@ export default function CountryPage() {
     }
   }, []);
 
+  // ── Plant source hot-swap ─────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getSource('plants') || !info || !countryFeatureRef.current) return;
+    const filename = plantSource === 'gppd'
+      ? `region_plants_${info.region.id}_gppd.geojson`
+      : `region_plants_${info.region.id}.geojson`;
+    fetch(`/data/cache/${filename}`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => {
+        const cf = countryFeatureRef.current;
+        const filtered = {
+          ...data,
+          features: data.features.filter(f => pointInFeature(f.geometry.coordinates, cf)),
+        };
+        map.getSource('plants').setData(filtered);
+        const fuels = new Set(filtered.features.map(f => f.properties.fuel).filter(f => FUEL_COLORS[f]));
+        setPresentFuels(fuels);
+      })
+      .catch(() => plantSource !== 'osm' && setPlantSource('osm'));
+  }, [plantSource, info]);
+
   if (!info) return <div style={{ padding: 40, color: t.text }}>Loading…</div>;
 
   const { country, region } = info;
@@ -345,11 +371,13 @@ export default function CountryPage() {
         fuelsOff={fuelsOff} kvsOff={kvsOff}
         linesOn={linesOn} plantsOn={plantsOn} subsOn={subsOn}
         minMw={minMw} circleScale={circleScale}
+        plantSource={plantSource}
         presentFuels={presentFuels}
         onToggleFuel={toggleFuel} onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
         onToggleSubs={toggleSubs}
         onMinMwChange={handleMinMw} onCircleScaleChange={handleCircleScale}
+        onSourceChange={setPlantSource}
       />
 
       <div ref={containerRef} style={{ flex: 1, height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />

@@ -19,7 +19,7 @@ function donutArc(cx, cy, R, r, start, end) {
   return `M${s1.x.toFixed(2)},${s1.y.toFixed(2)} A${R},${R},0,${lg},1,${e1.x.toFixed(2)},${e1.y.toFixed(2)} L${e2.x.toFixed(2)},${e2.y.toFixed(2)} A${r},${r},0,${lg},0,${s2.x.toFixed(2)},${s2.y.toFixed(2)} Z`;
 }
 
-export default function CapacityChart({ capacity, region, theme }) {
+export default function CapacityChart({ capacity, region, theme, source = 'osm' }) {
   const navigate = useNavigate();
   const t = getT(theme);
 
@@ -159,7 +159,7 @@ export default function CapacityChart({ capacity, region, theme }) {
       </div>
 
       <p style={{ fontSize: '0.52rem', color: t.lblMuted, marginTop: 8, fontStyle: 'italic' }}>
-        OSM · capacity data may be incomplete
+        {source === 'gppd' ? 'WRI GPPD v1.3' : 'OpenStreetMap'} · capacity may be incomplete
       </p>
     </div>
   );

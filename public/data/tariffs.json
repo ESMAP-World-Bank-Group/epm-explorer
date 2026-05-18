@@ -1,0 +1,30 @@
+{
+  "year": 2023,
+  "source": "World Bank / GlobalPetrolPrices / IRENA",
+  "note": "Approximate residential tariffs in USD/kWh. Verify before publication.",
+  "countries": {
+    "TUR": { "res": 0.085, "ind": 0.070 },
+    "ROU": { "res": 0.138, "ind": 0.112 },
+    "BGR": { "res": 0.110, "ind": 0.090 },
+    "GEO": { "res": 0.062, "ind": 0.055 },
+    "ARM": { "res": 0.075, "ind": 0.068 },
+    "AZE": { "res": 0.042, "ind": 0.038 },
+    "KAZ": { "res": 0.040, "ind": 0.035 },
+    "KGZ": { "res": 0.022, "ind": 0.018 },
+    "TJK": { "res": 0.028, "ind": 0.025 },
+    "TKM": { "res": 0.010, "ind": 0.009 },
+    "UZB": { "res": 0.035, "ind": 0.030 },
+    "EGY": { "res": 0.035, "ind": 0.045 },
+    "LBY": { "res": 0.005, "ind": 0.005 },
+    "SDN": { "res": 0.025, "ind": 0.020 },
+    "SSD": { "res": 0.150, "ind": 0.120 },
+    "ETH": { "res": 0.025, "ind": 0.030 },
+    "DJI": { "res": 0.175, "ind": 0.140 },
+    "KEN": { "res": 0.155, "ind": 0.122 },
+    "TZA": { "res": 0.082, "ind": 0.070 },
+    "SOM": { "res": 0.500, "ind": 0.450 },
+    "UGA": { "res": 0.172, "ind": 0.132 },
+    "RWA": { "res": 0.180, "ind": 0.150 },
+    "BDI": { "res": 0.195, "ind": 0.160 }
+  }
+}

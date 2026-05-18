@@ -5,6 +5,7 @@ import { useTheme } from '../App';
 import { getT, mapStyle, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CapacityChart from '../components/CapacityChart';
+import StatsPanel from '../components/StatsPanel';
 
 // ── Map helpers ──────────────────────────────────────────────────────────────
 
@@ -48,6 +49,8 @@ export default function RegionPage() {
   const [subsOn,       setSubsOn]       = useState(true);
   const [minMw,        setMinMw]        = useState(100);
   const [circleScale,  setCircleScale]  = useState(1.0);
+  const [plantSource,  setPlantSource]  = useState('osm');
+  const [activeTab,    setActiveTab]    = useState('overview');
 
   // Load region metadata
   useEffect(() => {
@@ -60,6 +63,7 @@ export default function RegionPage() {
     // Reset layer state on region change
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
+    setPlantSource('osm'); setActiveTab('overview');
   }, [regionId]);
 
   // Initialise map
@@ -67,6 +71,10 @@ export default function RegionPage() {
     if (!containerRef.current || !region) return;
 
     const isos = region.countries.map(c => c.iso);
+    // Expand to include territories shown separately in Natural Earth
+    // (e.g. Somaliland SOL is a distinct polygon but politically part of SOM)
+    const TERRITORY_ALIASES = { SOM: ['SOL'], SDN: ['SDS'] };
+    const expandedIsos = isos.flatMap(iso => [iso, ...(TERRITORY_ALIASES[iso] || [])]);
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -103,7 +111,7 @@ export default function RegionPage() {
       });
 
       // Fit map to region
-      const bounds = fitBounds(isos, countries);
+      const bounds = fitBounds(expandedIsos, countries);
       if (bounds) map.fitBounds(bounds, { padding: 40, duration: 0 });
 
       // ── Sources ─────────────────────────────────────────────────────────
@@ -147,7 +155,7 @@ export default function RegionPage() {
         id: 'region-fill',
         type: 'fill',
         source: 'countries',
-        filter: ['in', ['get', 'ISO_A3'], ['literal', isos]],
+        filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: {
           'fill-color': hl.fill,
           'fill-opacity': [
@@ -159,7 +167,7 @@ export default function RegionPage() {
         id: 'region-border',
         type: 'line',
         source: 'countries',
-        filter: ['in', ['get', 'ISO_A3'], ['literal', isos]],
+        filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'line-color': hl.border, 'line-width': hl.borderW, 'line-opacity': 0.9 },
       });
 
@@ -244,7 +252,10 @@ export default function RegionPage() {
       });
       map.on('click', 'region-fill', e => {
         const iso = e.features[0].properties.ISO_A3;
-        if (isos.includes(iso)) navigate(`/country/${iso}`);
+        // Map territory aliases back to canonical ISO (e.g. SOL → SOM)
+        const ALIAS_TO_CANON = { SOL: 'SOM', SDS: 'SDN' };
+        const canonIso = ALIAS_TO_CANON[iso] || iso;
+        if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
       });
     });
 
@@ -334,6 +345,24 @@ export default function RegionPage() {
     }
   }, []);
 
+  // ── Plant source hot-swap ─────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getSource('plants')) return;
+    const f = plantSource === 'gppd' ? `region_plants_${regionId}_gppd.geojson` : `region_plants_${regionId}.geojson`;
+    const cf = plantSource === 'gppd' ? `region_capacity_${regionId}_gppd.json` : `region_capacity_${regionId}.json`;
+    fetch(`/data/cache/${f}`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => {
+        map.getSource('plants').setData(data);
+        const fuels = new Set(data.features.map(f => f.properties.fuel).filter(f => FUEL_COLORS[f]));
+        setPresentFuels(fuels);
+        return fetch(`/data/cache/${cf}`).then(r => r.json());
+      })
+      .then(setCapacity)
+      .catch(() => plantSource !== 'osm' && setPlantSource('osm'));
+  }, [plantSource]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (!region) return (
@@ -347,11 +376,13 @@ export default function RegionPage() {
         fuelsOff={fuelsOff} kvsOff={kvsOff}
         linesOn={linesOn} plantsOn={plantsOn} subsOn={subsOn}
         minMw={minMw} circleScale={circleScale}
+        plantSource={plantSource}
         presentFuels={presentFuels}
         onToggleFuel={toggleFuel} onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
         onToggleSubs={toggleSubs}
         onMinMwChange={handleMinMw} onCircleScaleChange={handleCircleScale}
+        onSourceChange={setPlantSource}
       />
 
       {/* Map */}
@@ -386,9 +417,28 @@ export default function RegionPage() {
           width: 36, marginBottom: 20,
         }} />
 
-        <hr style={{ borderColor: t.hr, marginBottom: 14 }} />
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
+          {['Overview', 'Stats'].map(tab => {
+            const active = activeTab === tab.toLowerCase();
+            return (
+              <button key={tab} onClick={() => setActiveTab(tab.toLowerCase())} style={{
+                flex: 1, fontSize: '0.58rem', letterSpacing: '1px',
+                textTransform: 'uppercase', fontFamily: 'inherit',
+                padding: '4px 0', borderRadius: 4, cursor: 'pointer',
+                border: `1px solid ${active ? t.lbl : t.panelBorder}`,
+                backgroundColor: active ? 'rgba(128,160,192,0.12)' : 'transparent',
+                color: active ? t.lbl : t.lblMuted,
+                fontWeight: active ? 700 : 400,
+              }}>
+                {tab}
+              </button>
+            );
+          })}
+        </div>
 
-        <CapacityChart capacity={capacity} region={region} theme={theme} />
+        {activeTab === 'overview' && <CapacityChart capacity={capacity} region={region} theme={theme} source={plantSource} />}
+        {activeTab === 'stats'    && <StatsPanel    capacity={capacity} region={region} theme={theme} source={plantSource} />}
       </div>
     </div>
   );

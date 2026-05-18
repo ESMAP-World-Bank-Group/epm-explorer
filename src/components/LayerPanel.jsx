@@ -3,9 +3,10 @@ import { FUEL_COLORS, FUEL_LABELS, VOLTAGE_BRACKETS, getT } from '../constants';
 export default function LayerPanel({
   theme,
   fuelsOff, kvsOff, linesOn, plantsOn, subsOn, minMw, circleScale,
+  plantSource,
   presentFuels,
   onToggleFuel, onToggleKv, onToggleLines, onTogglePlants, onToggleSubs,
-  onMinMwChange, onCircleScaleChange,
+  onMinMwChange, onCircleScaleChange, onSourceChange,
 }) {
   const t = getT(theme);
 
@@ -46,11 +47,32 @@ export default function LayerPanel({
       <div
         className="layer-row"
         onClick={onTogglePlants}
-        style={{ marginBottom: 8, opacity: plantsOn ? 1 : 0.35 }}
+        style={{ marginBottom: 6, opacity: plantsOn ? 1 : 0.35 }}
       >
         <span style={sec}>Power Plants</span>
         <span style={mutedLabel}>existing</span>
       </div>
+
+      {/* Source toggle */}
+      {onSourceChange && (
+        <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+          {['osm', 'gppd'].map(src => {
+            const active = plantSource === src;
+            return (
+              <button key={src} onClick={() => onSourceChange(src)} style={{
+                flex: 1, fontSize: '0.5rem', letterSpacing: '1px',
+                textTransform: 'uppercase', fontFamily: 'inherit',
+                padding: '2px 0', borderRadius: 3, cursor: 'pointer',
+                border: `1px solid ${active ? 'rgba(128,160,192,0.6)' : 'rgba(128,160,192,0.18)'}`,
+                backgroundColor: active ? 'rgba(128,160,192,0.15)' : 'transparent',
+                color: active ? t.lbl : t.lblMuted,
+              }}>
+                {src === 'gppd' ? 'GPPD (WRI)' : 'OSM'}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Fuel rows */}
       <div style={{ marginBottom: 8 }}>
