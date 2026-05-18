@@ -128,9 +128,9 @@ export default function CountryOverview({ iso, region, capacity, fleetAge, tarif
                     {label}
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, color: t.lbl }}>
-                    ${val.toFixed(3)}
+                    ${Math.round(val * 1000)}
                   </div>
-                  <div style={{ fontSize: '0.44rem', color: t.lblMuted }}>USD/kWh</div>
+                  <div style={{ fontSize: '0.44rem', color: t.lblMuted }}>USD/MWh</div>
                 </div>
               ) : null
             ))}

@@ -181,19 +181,19 @@ export default function CapacityChart({ capacity, region, theme, source = 'osm',
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span>
               <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#40C057' }}>
-                ${tMin.toFixed(3)}
+                ${Math.round(tMin * 1000)}
               </span>
               <span style={{ fontSize: '0.5rem', color: t.lblMuted, marginLeft: 3 }}>{tMinIso}</span>
             </span>
             <span>
               <span style={{ fontSize: '0.5rem', color: t.lblMuted, marginRight: 3 }}>{tMaxIso}</span>
               <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#F03E3E' }}>
-                ${tMax.toFixed(3)}
+                ${Math.round(tMax * 1000)}
               </span>
             </span>
           </div>
           <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic' }}>
-            USD/kWh · {tariffs.year} · {tariffs.source}
+            USD/MWh · {tariffs.year} · {tariffs.source}
           </p>
         </div>
       )}

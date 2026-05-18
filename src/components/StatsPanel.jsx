@@ -43,7 +43,7 @@ export default function StatsPanel({ capacity, region, theme, source = 'osm', ta
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: '0.44rem', color: t.lblMuted, minWidth: 34, textAlign: 'right', letterSpacing: '0.5px' }}>GW</span>
         {tariffs && (
-          <span style={{ fontSize: '0.44rem', color: t.lblMuted, minWidth: 38, textAlign: 'right', letterSpacing: '0.5px' }}>$/kWh</span>
+          <span style={{ fontSize: '0.44rem', color: t.lblMuted, minWidth: 38, textAlign: 'right', letterSpacing: '0.5px' }}>$/MWh</span>
         )}
       </div>
 
@@ -102,7 +102,7 @@ export default function StatsPanel({ capacity, region, theme, source = 'osm', ta
                 flexShrink: 0, minWidth: 38, textAlign: 'right',
                 fontVariantNumeric: 'tabular-nums',
               }}>
-                {c.tariff != null ? c.tariff.toFixed(3) : '—'}
+                {c.tariff != null ? Math.round(c.tariff * 1000) : '—'}
               </span>
             )}
           </div>
@@ -181,7 +181,7 @@ export default function StatsPanel({ capacity, region, theme, source = 'osm', ta
       {/* ── Footer attributions ──────────────── */}
       {tariffs && (
         <p style={{ fontSize: '0.5rem', color: t.lblMuted, fontStyle: 'italic', marginBottom: 2 }}>
-          Tariff: USD/kWh res. · {tariffs.year} · {tariffs.source}
+          Tariff: USD/MWh res. · {tariffs.year} · {tariffs.source}
         </p>
       )}
       <p style={{ fontSize: '0.52rem', color: t.lblMuted, fontStyle: 'italic' }}>
