@@ -74,9 +74,9 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Right: Planning Suite + theme toggle */}
+      {/* Right: EPM Suite + theme toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {/* Planning Suite (coming soon) */}
+        {/* EPM Suite (coming soon) */}
         <div style={{ position: 'relative' }}>
           <button
             onMouseEnter={() => setSoonVisible(true)}
@@ -96,7 +96,7 @@ export default function Navbar() {
                  stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
-            Planning Suite
+            EPM Suite
             <span style={{
               fontSize: '0.48rem', letterSpacing: '1px', fontWeight: 700,
               color: 'rgba(74,143,204,0.65)',
@@ -116,7 +116,7 @@ export default function Navbar() {
               boxShadow: '0 4px 16px rgba(0,0,0,0.18)', lineHeight: 1.5,
             }}>
               <span style={{ color: t.lbl, fontWeight: 600, display: 'block', marginBottom: 4 }}>
-                Planning Suite
+                EPM Suite
               </span>
               EPM model outputs, scenario comparisons, capacity expansion results, and planning analytics — coming soon.
             </div>

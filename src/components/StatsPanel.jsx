@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { FUEL_COLORS, getT } from '../constants';
 
-export default function StatsPanel({ capacity, region, theme, source = 'osm', tariffs, fleetAge }) {
+export default function StatsPanel({ capacity, region, theme, source = 'osm', tariffs, fleetAge, access }) {
   const navigate = useNavigate();
   const t = getT(theme);
 
@@ -146,6 +146,37 @@ export default function StatsPanel({ capacity, region, theme, source = 'osm', ta
           Fleet age available with GPPD source
         </p>
       )}
+
+      {/* ── Electricity access ───────────────── */}
+      {access && (() => {
+        const withAccess = countryData.filter(c => access.countries?.[c.iso]?.total != null);
+        if (!withAccess.length) return null;
+        return (
+          <div style={{ marginBottom: 10 }}>
+            <span style={sec}>Electricity Access · Total %</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {withAccess.map(c => {
+                const val = access.countries[c.iso].total;
+                const color = val < 50 ? '#F03E3E' : val < 90 ? '#FCC419' : '#40C057';
+                return (
+                  <div key={c.iso}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <span style={{ fontSize: '0.6rem', color: t.lblRow }}>{c.iso}</span>
+                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color }}>{val}%</span>
+                    </div>
+                    <div style={{ height: 4, borderRadius: 2, backgroundColor: 'rgba(128,160,192,0.1)', overflow: 'hidden' }}>
+                      <div style={{ width: `${val}%`, height: '100%', backgroundColor: color, opacity: 0.75, borderRadius: 2 }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 6, fontStyle: 'italic' }}>
+              World Bank / SE4All · {access.year}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* ── Footer attributions ──────────────── */}
       {tariffs && (

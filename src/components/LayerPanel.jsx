@@ -55,32 +55,37 @@ export default function LayerPanel({
 
       {/* Source toggle */}
       {onSourceChange && (
-        <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
-          {['osm', 'gppd'].map(src => {
-            const active    = plantSource === src;
-            const disabled  = src === 'gppd' && gppdAvailable === false;
-            const checking  = src === 'gppd' && gppdAvailable === null;
-            return (
-              <button
-                key={src}
-                onClick={() => !disabled && onSourceChange(src)}
-                title={disabled ? 'GPPD data not available — run prepare_gppd.py' : checking ? 'Checking…' : undefined}
-                style={{
-                  flex: 1, fontSize: '0.5rem', letterSpacing: '1px',
-                  textTransform: 'uppercase', fontFamily: 'inherit',
-                  padding: '2px 0', borderRadius: 3,
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  border: `1px solid ${active ? 'rgba(128,160,192,0.6)' : 'rgba(128,160,192,0.18)'}`,
-                  backgroundColor: active ? 'rgba(128,160,192,0.15)' : 'transparent',
-                  color: active ? t.lbl : t.lblMuted,
-                  opacity: disabled ? 0.35 : checking ? 0.6 : 1,
-                }}
-              >
-                {src === 'gppd' ? 'GPPD (WRI)' : 'OSM'}
-              </button>
-            );
-          })}
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 3, marginBottom: gppdAvailable === false ? 4 : 8 }}>
+            {['osm', 'gppd'].map(src => {
+              const active   = plantSource === src;
+              const unavail  = src === 'gppd' && gppdAvailable === false;
+              const checking = src === 'gppd' && gppdAvailable === null;
+              return (
+                <button
+                  key={src}
+                  onClick={() => onSourceChange(src)}
+                  style={{
+                    flex: 1, fontSize: '0.5rem', letterSpacing: '1px',
+                    textTransform: 'uppercase', fontFamily: 'inherit',
+                    padding: '2px 0', borderRadius: 3, cursor: 'pointer',
+                    border: `1px ${unavail ? 'dashed' : 'solid'} ${active ? 'rgba(128,160,192,0.6)' : 'rgba(128,160,192,0.18)'}`,
+                    backgroundColor: active ? 'rgba(128,160,192,0.15)' : 'transparent',
+                    color: active ? t.lbl : t.lblMuted,
+                    opacity: unavail ? 0.45 : checking ? 0.65 : 1,
+                  }}
+                >
+                  {src === 'gppd' ? 'GPPD (WRI)' : 'OSM'}
+                </button>
+              );
+            })}
+          </div>
+          {gppdAvailable === false && (
+            <p style={{ fontSize: '0.47rem', color: '#B8860B', fontStyle: 'italic', marginBottom: 6 }}>
+              Files not found — run prepare_gppd.py
+            </p>
+          )}
+        </>
       )}
 
       {/* Fuel rows */}

@@ -1,0 +1,30 @@
+{
+  "year": 2022,
+  "source": "World Bank / SE4All / IEA",
+  "note": "% of population with access to electricity. Approximate values.",
+  "countries": {
+    "TUR": { "total": 100, "urban": 100, "rural": 100 },
+    "ROU": { "total": 100, "urban": 100, "rural": 100 },
+    "BGR": { "total": 100, "urban": 100, "rural": 100 },
+    "GEO": { "total": 100, "urban": 100, "rural": 100 },
+    "ARM": { "total": 100, "urban": 100, "rural": 100 },
+    "AZE": { "total": 100, "urban": 100, "rural": 100 },
+    "KAZ": { "total": 100, "urban": 100, "rural": 100 },
+    "KGZ": { "total":  99, "urban": 100, "rural":  99 },
+    "TJK": { "total": 100, "urban": 100, "rural": 100 },
+    "TKM": { "total": 100, "urban": 100, "rural": 100 },
+    "UZB": { "total": 100, "urban": 100, "rural": 100 },
+    "EGY": { "total": 100, "urban": 100, "rural": 100 },
+    "LBY": { "total":  99, "urban":  99, "rural":  97 },
+    "SDN": { "total":  63, "urban":  87, "rural":  46 },
+    "SSD": { "total":   8, "urban":  16, "rural":   4 },
+    "ETH": { "total":  48, "urban":  97, "rural":  30 },
+    "DJI": { "total":  65, "urban":  72, "rural":  14 },
+    "KEN": { "total":  76, "urban":  97, "rural":  63 },
+    "TZA": { "total":  44, "urban":  74, "rural":  27 },
+    "SOM": { "total":  36, "urban":  56, "rural":  15 },
+    "UGA": { "total":  42, "urban":  76, "rural":  30 },
+    "RWA": { "total":  53, "urban":  90, "rural":  45 },
+    "BDI": { "total":  12, "urban":  55, "rural":   4 }
+  }
+}

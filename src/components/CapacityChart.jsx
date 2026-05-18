@@ -35,7 +35,7 @@ function KpiCard({ label, value, accent, t }) {
   );
 }
 
-export default function CapacityChart({ capacity, region, theme, source = 'osm', tariffs }) {
+export default function CapacityChart({ capacity, region, theme, source = 'osm', tariffs, access }) {
   const t = getT(theme);
   const sec = {
     fontSize: '0.5rem', letterSpacing: '2px', fontWeight: 700,
@@ -66,6 +66,18 @@ export default function CapacityChart({ capacity, region, theme, source = 'osm',
       if (d?.res != null) {
         if (tMin === null || d.res < tMin) { tMin = d.res; tMinIso = c.iso; }
         if (tMax === null || d.res > tMax) { tMax = d.res; tMaxIso = c.iso; }
+      }
+    }
+  }
+
+  // Access range across region
+  let aMin = null, aMax = null, aMinIso = null, aMaxIso = null;
+  if (access) {
+    for (const c of region.countries) {
+      const d = access.countries?.[c.iso];
+      if (d?.total != null) {
+        if (aMin === null || d.total < aMin) { aMin = d.total; aMinIso = c.iso; }
+        if (aMax === null || d.total > aMax) { aMax = d.total; aMaxIso = c.iso; }
       }
     }
   }
@@ -182,6 +194,31 @@ export default function CapacityChart({ capacity, region, theme, source = 'osm',
           </div>
           <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic' }}>
             USD/kWh · {tariffs.year} · {tariffs.source}
+          </p>
+        </div>
+      )}
+
+      {/* ── Access range ──────────────────────── */}
+      {aMin !== null && (
+        <div style={{ marginBottom: 8 }}>
+          <span style={sec}>Electricity Access · Total Population</span>
+          <div style={{
+            height: 6, borderRadius: 3,
+            background: 'linear-gradient(90deg, #F03E3E, #FCC419, #40C057)',
+            marginBottom: 6,
+          }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#F03E3E' }}>{aMin}%</span>
+              <span style={{ fontSize: '0.5rem', color: t.lblMuted, marginLeft: 3 }}>{aMinIso}</span>
+            </span>
+            <span>
+              <span style={{ fontSize: '0.5rem', color: t.lblMuted, marginRight: 3 }}>{aMaxIso}</span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#40C057' }}>{aMax}%</span>
+            </span>
+          </div>
+          <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic' }}>
+            World Bank / SE4All · {access.year}
           </p>
         </div>
       )}

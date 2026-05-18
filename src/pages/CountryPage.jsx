@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
 import { getT, mapStyle, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
+import CountryOverview from '../components/CountryOverview';
 
 // Ray-casting point-in-polygon (handles Polygon + MultiPolygon)
 function pointInRing(pt, ring) {
@@ -62,7 +63,17 @@ export default function CountryPage() {
   const [circleScale,  setCircleScale]  = useState(1.0);
   const [plantSource,   setPlantSource]   = useState('osm');
   const [gppdAvailable, setGppdAvailable] = useState(null);
+  const [capacity,      setCapacity]      = useState(null);
+  const [fleetAge,      setFleetAge]      = useState(null);
+  const [tariffs,       setTariffs]       = useState(null);
+  const [access,        setAccess]        = useState(null);
   const countryFeatureRef = useRef(null);
+
+  // Static data — fetch once
+  useEffect(() => {
+    fetch('/data/tariffs.json').then(r => r.json()).then(setTariffs).catch(() => {});
+    fetch('/data/access.json').then(r => r.json()).then(setAccess).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch('/data/regions.json').then(r => r.json()).then(d => {
@@ -176,7 +187,7 @@ export default function CountryPage() {
           filter: kvFilters[key],
           paint: {
             'line-color': color, 'line-width': width,
-            'line-opacity': theme === 'dark' ? 0.7 : 0.55,
+            'line-opacity': theme === 'dark' ? 0.88 : 0.65,
           },
         });
       }
@@ -370,6 +381,26 @@ export default function CountryPage() {
       });
   }, [plantSource, info]);
 
+  // Capacity summary for right panel
+  useEffect(() => {
+    if (!info) return;
+    setCapacity(null);
+    const cf = plantSource === 'gppd'
+      ? `/data/cache/region_capacity_${info.region.id}_gppd.json`
+      : `/data/cache/region_capacity_${info.region.id}.json`;
+    fetch(cf).then(r => r.json()).then(setCapacity).catch(() => {});
+  }, [info, plantSource]);
+
+  // Fleet age — GPPD only
+  useEffect(() => {
+    setFleetAge(null);
+    if (!info || plantSource !== 'gppd') return;
+    fetch(`/data/cache/region_age_${info.region.id}_gppd.json`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setFleetAge)
+      .catch(() => setFleetAge(null));
+  }, [plantSource, info]);
+
   if (!info) return <div style={{ padding: 40, color: t.text }}>Loading…</div>;
 
   const { country, region } = info;
@@ -412,23 +443,36 @@ export default function CountryPage() {
         <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: t.text, marginBottom: 8 }}>
           {country.name}
         </h2>
-        <span style={{
-          fontSize: '0.68rem', fontWeight: 600, color: 'white',
-          backgroundColor: region.color, borderRadius: 4,
-          padding: '2px 8px', display: 'inline-block', marginBottom: 16,
-        }}>
-          {iso}
-        </span>
-        <div style={{ height: 3, borderRadius: 2, backgroundColor: region.color, width: 36, marginBottom: 20 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+          <span style={{
+            fontSize: '0.68rem', fontWeight: 600, color: 'white',
+            backgroundColor: region.color, borderRadius: 4,
+            padding: '2px 8px', display: 'inline-block',
+          }}>
+            {iso}
+          </span>
+          <div style={{ height: 3, width: 24, borderRadius: 2, backgroundColor: region.color }} />
+        </div>
 
-        <hr style={{ borderColor: t.hr, marginBottom: 16 }} />
+        <CountryOverview
+          iso={iso}
+          region={region}
+          capacity={capacity}
+          fleetAge={fleetAge}
+          tariffs={tariffs}
+          access={access}
+          theme={theme}
+          source={plantSource}
+        />
 
-        <Link
-          to={`/region/${region.id}`}
-          style={{ fontSize: '0.78rem', color: region.color, display: 'flex', alignItems: 'center', gap: 5 }}
-        >
-          ← Back to {region.name}
-        </Link>
+        <div style={{ borderTop: `1px solid ${t.hr}`, paddingTop: 12, marginTop: 4 }}>
+          <Link
+            to={`/region/${region.id}`}
+            style={{ fontSize: '0.75rem', color: region.color, display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            ← Back to {region.name}
+          </Link>
+        </div>
       </div>
     </div>
   );

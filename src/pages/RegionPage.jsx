@@ -55,9 +55,12 @@ export default function RegionPage() {
   const [plantSource,   setPlantSource]  = useState('osm');
   const [activeTab,     setActiveTab]    = useState('overview');
 
-  // Static tariffs — fetch once
+  const [access, setAccess] = useState(null);
+
+  // Static data — fetch once
   useEffect(() => {
     fetch('/data/tariffs.json').then(r => r.json()).then(setTariffs).catch(() => {});
+    fetch('/data/access.json').then(r => r.json()).then(setAccess).catch(() => {});
   }, []);
 
   // Load region metadata + check GPPD availability
@@ -167,7 +170,7 @@ export default function RegionPage() {
           paint: {
             'line-color': color,
             'line-width': width,
-            'line-opacity': theme === 'dark' ? 0.7 : 0.55,
+            'line-opacity': theme === 'dark' ? 0.88 : 0.65,
           },
         });
       }
@@ -462,8 +465,8 @@ export default function RegionPage() {
           })}
         </div>
 
-        {activeTab === 'overview'   && <CapacityChart capacity={capacity} region={region} theme={theme} source={plantSource} tariffs={tariffs} />}
-        {activeTab === 'countries' && <StatsPanel    capacity={capacity} region={region} theme={theme} source={plantSource} tariffs={tariffs} fleetAge={fleetAge} />}
+        {activeTab === 'overview'   && <CapacityChart capacity={capacity} region={region} theme={theme} source={plantSource} tariffs={tariffs} access={access} />}
+        {activeTab === 'countries'  && <StatsPanel    capacity={capacity} region={region} theme={theme} source={plantSource} tariffs={tariffs} fleetAge={fleetAge} access={access} />}
       </div>
     </div>
   );
