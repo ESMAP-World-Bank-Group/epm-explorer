@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
 import { getT, mapStyle, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
+import CapacityChart from '../components/CapacityChart';
 
 // ── Map helpers ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export default function RegionPage() {
   const mapRef       = useRef(null);
 
   const [region,       setRegion]       = useState(null);
+  const [capacity,     setCapacity]     = useState(null);
   const [presentFuels, setPresentFuels] = useState(new Set());
   const [fuelsOff,     setFuelsOff]     = useState(new Set());
   const [kvsOff,       setKvsOff]       = useState(new Set());
@@ -53,6 +55,8 @@ export default function RegionPage() {
       const r = (d.regions || []).find(r => r.id === regionId);
       setRegion(r || null);
     });
+    setCapacity(null);
+    fetch(`/data/cache/region_capacity_${regionId}.json`).then(r => r.json()).then(setCapacity).catch(() => {});
     // Reset layer state on region change
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
@@ -201,17 +205,18 @@ export default function RegionPage() {
         });
       }
 
-      // ── Substations ─────────────────────────────────────────────────────────
+      // ── Substations (tiny dimgrey squares via custom image) ─────────────────
+      const sqSz = 5;
+      const sqData = new Uint8Array(sqSz * sqSz * 4);
+      for (let i = 0; i < sqSz * sqSz; i++) {
+        sqData[i * 4] = 105; sqData[i * 4 + 1] = 105; sqData[i * 4 + 2] = 105;
+        sqData[i * 4 + 3] = theme === 'dark' ? 160 : 130;
+      }
+      map.addImage('sub-sq', { width: sqSz, height: sqSz, data: sqData });
       map.addLayer({
-        id: 'substations',
-        type: 'circle',
-        source: 'substations',
-        paint: {
-          'circle-radius': 2.5,
-          'circle-color': theme === 'dark' ? 'rgba(200,220,240,0.6)' : 'rgba(30,40,50,0.5)',
-          'circle-stroke-width': 0,
-          'circle-opacity': 1,
-        },
+        id: 'substations', type: 'symbol', source: 'substations',
+        layout: { 'icon-image': 'sub-sq', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+        paint: { 'icon-opacity': 0.8 },
       });
       map.on('mouseenter', 'substations', e => {
         map.getCanvas().style.cursor = 'pointer';
@@ -381,38 +386,9 @@ export default function RegionPage() {
           width: 36, marginBottom: 20,
         }} />
 
-        <p style={{
-          fontSize: '0.57rem', letterSpacing: '2px', fontWeight: 700,
-          color: t.lblMuted, textTransform: 'uppercase', marginBottom: 10,
-        }}>
-          Select a Country
-        </p>
+        <hr style={{ borderColor: t.hr, marginBottom: 14 }} />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {region.countries.map(c => (
-            <Link
-              key={c.iso}
-              to={`/country/${c.iso}`}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', borderRadius: 6,
-                fontSize: '0.8rem', color: t.text,
-                backgroundColor: t.cardBg,
-                border: `1px solid ${t.cardBorder}`,
-                transition: 'border-color 0.15s',
-              }}
-            >
-              <span style={{
-                fontSize: '0.6rem', fontWeight: 600, color: 'white',
-                backgroundColor: region.color, borderRadius: 3,
-                padding: '1px 5px', flexShrink: 0,
-              }}>
-                {c.iso}
-              </span>
-              {c.name}
-            </Link>
-          ))}
-        </div>
+        <CapacityChart capacity={capacity} region={region} theme={theme} />
       </div>
     </div>
   );

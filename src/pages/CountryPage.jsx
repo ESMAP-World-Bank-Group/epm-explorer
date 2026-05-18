@@ -227,17 +227,18 @@ export default function CountryPage() {
         });
       }
 
-      // ── Substations ──────────────────────────────────────────────────────
+      // ── Substations (tiny dimgrey squares via custom image) ──────────────────
+      const sqSz = 5;
+      const sqData = new Uint8Array(sqSz * sqSz * 4);
+      for (let i = 0; i < sqSz * sqSz; i++) {
+        sqData[i * 4] = 105; sqData[i * 4 + 1] = 105; sqData[i * 4 + 2] = 105;
+        sqData[i * 4 + 3] = theme === 'dark' ? 160 : 130;
+      }
+      map.addImage('sub-sq', { width: sqSz, height: sqSz, data: sqData });
       map.addLayer({
-        id: 'substations',
-        type: 'circle',
-        source: 'substations',
-        paint: {
-          'circle-radius': 2.5,
-          'circle-color': theme === 'dark' ? 'rgba(200,220,240,0.6)' : 'rgba(30,40,50,0.5)',
-          'circle-stroke-width': 0,
-          'circle-opacity': 1,
-        },
+        id: 'substations', type: 'symbol', source: 'substations',
+        layout: { 'icon-image': 'sub-sq', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+        paint: { 'icon-opacity': 0.8 },
       });
       map.on('mouseenter', 'substations', e => {
         map.getCanvas().style.cursor = 'pointer';

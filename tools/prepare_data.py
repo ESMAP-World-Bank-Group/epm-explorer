@@ -40,9 +40,10 @@ for src_path in (SRC / "cache").glob("region_plants_*.json"):
                 "id": i,
                 "geometry": {"type": "Point", "coordinates": [p["lon"], p["lat"]]},
                 "properties": {
-                    "name": p.get("name") or "",
-                    "fuel": (p.get("fuel") or "unknown").split(";")[0].strip().lower(),
-                    "mw":   _safe_mw(p.get("mw")),
+                    "name":    p.get("name") or "",
+                    "fuel":    (p.get("fuel") or "unknown").split(";")[0].strip().lower(),
+                    "mw":      _safe_mw(p.get("mw")),
+                    "country": p.get("country") or "",
                 },
             }
             for i, p in enumerate(plants)
@@ -76,7 +77,15 @@ for src_path in (SRC / "cache").glob("region_lines_*.json"):
     out.write_text(json.dumps(geojson), encoding="utf-8")
     print(f"✓ {out.name}  ({len(geojson['features'])} segments)")
 
-# 5. substations: [{lat,lon,name,v}] → GeoJSON FeatureCollection
+# 5. capacity summary (copy as-is — already clean JSON)
+for src_path in (SRC / "cache").glob("region_capacity_*.json"):
+    region_id = src_path.stem.replace("region_capacity_", "")
+    dst = DST / "cache" / f"region_capacity_{region_id}.json"
+    shutil.copy(src_path, dst)
+    n = len(json.loads(dst.read_text(encoding="utf-8")).get("countries", {}))
+    print(f"✓ region_capacity_{region_id}.json  ({n} countries)")
+
+# 6. substations: [{lat,lon,name,v}] → GeoJSON FeatureCollection
 for src_path in (SRC / "cache").glob("region_substations_*.json"):
     region_id = src_path.stem.replace("region_substations_", "")
     subs = json.loads(src_path.read_text(encoding="utf-8"))
