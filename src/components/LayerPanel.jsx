@@ -108,11 +108,11 @@ export default function LayerPanel({
     }}>
       {/* ── POWER PLANTS ──────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div className="layer-row" onClick={onTogglePlants}
-          style={{ opacity: plantsOn ? 1 : 0.35, display: 'flex', alignItems: 'center', gap: 0 }}>
-          <span style={sec}>Power Plants</span>
+        <span className="layer-row" onClick={onTogglePlants}
+          style={{ opacity: plantsOn ? 1 : 0.35, cursor: 'pointer' }}>
+          <span style={sec}>Plants</span>
           <span style={mutedLabel}>existing</span>
-        </div>
+        </span>
         {onDownloadPlants && (
           <button style={dlIconBtn} onClick={e => { e.stopPropagation(); onDownloadPlants(); }}
             title="Download plants GeoJSON">
@@ -221,11 +221,11 @@ export default function LayerPanel({
 
       {/* ── TRANSMISSION ──────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div className="layer-row" onClick={onToggleLines}
-          style={{ opacity: linesOn ? 1 : 0.35 }}>
+        <span className="layer-row" onClick={onToggleLines}
+          style={{ opacity: linesOn ? 1 : 0.35, cursor: 'pointer' }}>
           <span style={sec}>Transmission</span>
           <span style={mutedLabel}>existing</span>
-        </div>
+        </span>
         {onDownloadLines && (
           <button style={dlIconBtn} onClick={e => { e.stopPropagation(); onDownloadLines(); }}
             title="Download lines GeoJSON">
