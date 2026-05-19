@@ -220,18 +220,6 @@ export default function RegionPage() {
         layout: { visibility: 'none' },
         paint: { 'line-color': tv.isDark ? '#bbb' : '#444', 'line-width': 1.2, 'line-opacity': 0.7 },
       });
-      map.addLayer({ id: 'region-zones-labels', type: 'symbol', source: 'region-zones',
-        layout: {
-          visibility: 'none',
-          'text-field': ['get', 'zone_id'], 'text-size': 10,
-          'text-anchor': 'center', 'text-allow-overlap': false,
-        },
-        paint: {
-          'text-color': tv.isDark ? '#eee' : '#111',
-          'text-halo-color': tv.isDark ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.88)',
-          'text-halo-width': 1.5,
-        },
-      });
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
       const fuels = new Set();
@@ -369,12 +357,19 @@ export default function RegionPage() {
           map.setFeatureState({ source: 'countries', id: hoveredId }, { hover: false });
         hoveredId = null;
       });
+      const ALIAS_TO_CANON = { SOL: 'SOM', SDS: 'SDN' };
       map.on('click', 'region-fill', e => {
         const iso = e.features[0].properties.ISO_A3;
-        const ALIAS_TO_CANON = { SOL: 'SOM', SDS: 'SDN' };
         const canonIso = (!isos.includes(iso) && ALIAS_TO_CANON[iso]) || iso;
         if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
       });
+      map.on('click', 'region-zones-fill', e => {
+        const iso = e.features[0].properties.ISO_A3 || e.features[0].properties.country;
+        const canonIso = (!isos.includes(iso) && ALIAS_TO_CANON[iso]) || iso;
+        if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
+      });
+      map.on('mouseenter', 'region-zones-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'region-zones-fill', () => { map.getCanvas().style.cursor = ''; });
 
     });
 
@@ -406,13 +401,13 @@ export default function RegionPage() {
         .then(data => {
           if (!mapRef.current?.getSource('region-zones')) return;
           mapRef.current.getSource('region-zones').setData(data);
-          for (const id of ['region-zones-fill', 'region-zones-border', 'region-zones-labels'])
+          for (const id of ['region-zones-fill', 'region-zones-border'])
             mapRef.current.setLayoutProperty(id, 'visibility', 'visible');
           mapRef.current.setLayoutProperty('region-fill', 'visibility', 'none');
         })
         .catch(() => setMapMode('countries'));
     } else {
-      for (const id of ['region-zones-fill', 'region-zones-border', 'region-zones-labels'])
+      for (const id of ['region-zones-fill', 'region-zones-border'])
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
       if (map.getLayer('region-fill')) map.setLayoutProperty('region-fill', 'visibility', 'visible');
       if (map.getSource('region-zones'))
@@ -678,29 +673,27 @@ export default function RegionPage() {
         <div ref={containerRef}
           style={{ width: '100%', height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
         {zonesAvailable && (
-          <div style={{
-            position: 'absolute', top: 10, left: 10, zIndex: 10,
-            display: 'flex', gap: 2,
-            background: t.panel, borderRadius: 6,
-            border: `1px solid ${t.panelBorder}`,
-            padding: 3, boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-          }}>
-            {[['countries', 'Countries'], ['zones', 'Zones']].map(([mode, label]) => {
-              const active = mapMode === mode;
-              return (
-                <button key={mode} onClick={() => setMapMode(mode)} style={{
-                  fontSize: '0.6rem', letterSpacing: '0.6px', textTransform: 'uppercase',
-                  fontFamily: 'inherit', padding: '3px 10px', borderRadius: 4,
-                  cursor: 'pointer', border: 'none',
-                  backgroundColor: active ? t.lbl : 'transparent',
-                  color: active ? (t.isDark ? '#111' : '#fff') : t.lblMuted,
-                  fontWeight: active ? 700 : 400, transition: 'background 0.15s',
-                }}>
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          <button
+            onClick={() => setMapMode(m => m === 'zones' ? 'countries' : 'zones')}
+            style={{
+              position: 'absolute', top: 10, left: 10, zIndex: 10,
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: '0.58rem', letterSpacing: '0.5px', fontFamily: 'inherit',
+              padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+              border: `1px solid ${mapMode === 'zones' ? 'rgba(74,143,204,0.6)' : t.panelBorder}`,
+              backgroundColor: mapMode === 'zones' ? 'rgba(74,143,204,0.14)' : t.panel,
+              color: mapMode === 'zones' ? t.lbl : t.lblMuted,
+              fontWeight: mapMode === 'zones' ? 700 : 400,
+              boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+              transition: 'all 0.15s',
+            }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: 2,
+              backgroundColor: mapMode === 'zones' ? 'rgba(74,143,204,0.8)' : t.panelBorder,
+              display: 'inline-block', transition: 'background 0.15s',
+            }} />
+            Recommended Zoning
+          </button>
         )}
       </div>
 
