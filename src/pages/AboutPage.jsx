@@ -256,46 +256,6 @@ export default function AboutPage() {
           </p>
         </div>
 
-        {/* ── EPM Model box ── */}
-        <div style={{
-          marginBottom: 36, padding: '16px 20px', borderRadius: 8,
-          border: `1px solid ${t.panelBorder}`,
-          backgroundColor: t.panel,
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
-          <div>
-            <div style={{ fontSize: '0.48rem', letterSpacing: '2px', fontWeight: 700, color: t.lblMuted, textTransform: 'uppercase', marginBottom: 4 }}>
-              World Bank · ESMAP
-            </div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: t.text, marginBottom: 4 }}>
-              EPM — Electricity Planning Model
-            </div>
-            <p style={{ fontSize: '0.68rem', color: t.muted, lineHeight: 1.65, margin: 0 }}>
-              A capacity expansion and dispatch optimization model for World Bank power sector planning studies.
-              This explorer is the geospatial front-end for visualizing model inputs and country context.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {[
-              { label: 'EPM Documentation', url: 'https://esmap-world-bank-group.github.io/EPM_main/' },
-              { label: 'GitHub Repository',  url: 'https://github.com/ESMAP-World-Bank-Group/epm-explorer' },
-            ].map(({ label, url }) => (
-              <a key={label} href={url} target="_blank" rel="noopener noreferrer" style={{
-                fontSize: '0.62rem', color: 'rgba(74,143,204,0.85)',
-                border: '1px solid rgba(74,143,204,0.3)', borderRadius: 4,
-                padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5,
-              }}>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                  <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                </svg>
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-
         {/* Tables by category */}
         {SOURCES.map(({ category, rows }) => (
           <div key={category}>

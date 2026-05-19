@@ -5,6 +5,7 @@ import WorldPage from './pages/WorldPage';
 import RegionPage from './pages/RegionPage';
 import CountryPage from './pages/CountryPage';
 import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
 import { getT } from './constants';
 
 export const ThemeCtx = createContext({ theme: 'dark', toggle: () => {} });
@@ -28,25 +29,9 @@ export default function App() {
               <Route path="/region/:regionId"    element={<RegionPage />} />
               <Route path="/country/:iso"        element={<CountryPage />} />
               <Route path="/about"               element={<AboutPage />} />
+              <Route path="/contact"             element={<ContactPage />} />
             </Routes>
           </div>
-        </div>
-
-        {/* Bottom-left attribution */}
-        <div style={{
-          position: 'fixed', bottom: 10, left: 12, zIndex: 100,
-          backgroundColor: t.panel,
-          border: `1px solid ${t.panelBorder}`,
-          borderRadius: 5,
-          padding: '5px 9px',
-          lineHeight: 1.6,
-        }}>
-          <div style={{ fontSize: '0.44rem', fontWeight: 700, letterSpacing: '0.8px', color: t.lblMuted, textTransform: 'uppercase' }}>
-            World Bank · ESMAP
-          </div>
-          <a href="mailto:mbaronnet@worldbank.org" style={{ fontSize: '0.42rem', color: t.lblMuted, textDecoration: 'none', opacity: 0.75 }}>
-            mbaronnet@worldbank.org
-          </a>
         </div>
       </BrowserRouter>
     </ThemeCtx.Provider>

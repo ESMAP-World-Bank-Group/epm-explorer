@@ -44,7 +44,6 @@ export default function Navbar() {
   const location = useLocation();
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
-  // Pass region/country context to the dashboard if available
   const dashboardUrl = useMemo(() => {
     const parts = location.pathname.split('/').filter(Boolean);
     const params = new URLSearchParams();
@@ -54,6 +53,19 @@ export default function Navbar() {
     return qs ? `${EPM_DASHBOARD_URL}?${qs}` : EPM_DASHBOARD_URL;
   }, [location.pathname]);
 
+  const navBtn = (active = false) => ({
+    background: 'none',
+    border: `1px solid ${active ? 'rgba(128,160,192,0.5)' : t.panelBorder}`,
+    borderRadius: 5, padding: '3px 10px',
+    cursor: 'pointer',
+    color: active ? t.lbl : t.lblMuted,
+    fontSize: '0.68rem', letterSpacing: '1px',
+    textTransform: 'uppercase', fontFamily: 'inherit',
+    textDecoration: 'none',
+    display: 'inline-flex', alignItems: 'center',
+    transition: 'border-color 0.2s, color 0.2s',
+  });
+
   return (
     <div style={{
       height: 46, display: 'flex', alignItems: 'center',
@@ -62,6 +74,7 @@ export default function Navbar() {
       justifyContent: 'space-between', flexShrink: 0,
       zIndex: 200,
     }}>
+
       {/* Left: logo + breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Link to="/" style={{
@@ -87,8 +100,28 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Right: EPM Suite + Data Sources + theme toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* Center: WB · ESMAP branding */}
+      <div style={{
+        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        pointerEvents: 'none',
+      }}>
+        <div style={{
+          fontSize: '0.52rem', fontWeight: 700, letterSpacing: '2.5px',
+          color: t.lblMuted, textTransform: 'uppercase', lineHeight: 1.3, opacity: 0.7,
+        }}>
+          World Bank · ESMAP
+        </div>
+      </div>
+
+      {/* Right: theme toggle | EPM Suite | Data Sources | Contact */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+
+        {/* Theme toggle */}
+        <button onClick={toggle} style={navBtn()}>
+          {theme === 'dark' ? '☀ Light' : '◑ Dark'}
+        </button>
+
         {/* EPM Suite */}
         <div style={{ position: 'relative' }}>
           <a
@@ -98,17 +131,12 @@ export default function Navbar() {
             onMouseEnter={() => setTooltipVisible(true)}
             onMouseLeave={() => setTooltipVisible(false)}
             style={{
-              background: 'none',
-              border: `1px solid rgba(74,143,204,0.55)`,
-              borderRadius: 5, padding: '3px 10px',
-              cursor: 'pointer', color: 'rgba(74,143,204,0.9)',
-              fontSize: '0.68rem', letterSpacing: '1px',
-              textTransform: 'uppercase', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 6,
-              textDecoration: 'none',
-              transition: 'border-color 0.2s, color 0.2s, background 0.2s',
+              ...navBtn(),
+              color: 'rgba(74,143,204,0.9)',
+              border: `1px solid rgba(74,143,204,0.45)`,
+              gap: 6,
             }}
-            onMouseOver={e => e.currentTarget.style.background = 'rgba(74,143,204,0.08)'}
+            onMouseOver={e => e.currentTarget.style.background = 'rgba(74,143,204,0.07)'}
             onMouseOut={e => { e.currentTarget.style.background = 'none'; setTooltipVisible(false); }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
@@ -118,57 +146,40 @@ export default function Navbar() {
             EPM Suite
             <svg width="8" height="8" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-                 style={{ opacity: 0.55 }}>
+                 style={{ opacity: 0.5 }}>
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-              <polyline points="15 3 21 3 21 9"/>
-              <line x1="10" y1="14" x2="21" y2="3"/>
+              <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
           </a>
 
           {tooltipVisible && (
             <div style={{
-              position: 'absolute', top: 34, right: 0, zIndex: 300,
+              position: 'absolute', top: 36, right: 0, zIndex: 300,
               backgroundColor: t.panel, border: `1px solid ${t.panelBorder}`,
-              borderRadius: 6, padding: '10px 13px', width: 230,
+              borderRadius: 6, padding: '10px 14px', width: 240,
               fontSize: '0.68rem', color: t.muted,
               boxShadow: '0 4px 16px rgba(0,0,0,0.18)', lineHeight: 1.6,
               pointerEvents: 'none',
             }}>
               <span style={{ color: t.lbl, fontWeight: 600, display: 'block', marginBottom: 4 }}>
-                EPM Suite · Results Dashboard
+                EPM Suite · Capacity Expansion Results
               </span>
-              Capacity expansion results, scenario comparisons, dispatch analysis and planning analytics.
+              Scenario comparisons, dispatch analysis, and planning outputs from the EPM model.{' '}
+              <span style={{ color: 'rgba(74,143,204,0.8)', fontStyle: 'italic' }}>Coming soon.</span>
             </div>
           )}
         </div>
 
         {/* Data Sources */}
-        <Link to="/about" style={{
-          background: 'none',
-          border: `1px solid ${t.panelBorder}`,
-          borderRadius: 5, padding: '3px 10px',
-          cursor: 'pointer', color: t.lblMuted,
-          fontSize: '0.68rem', letterSpacing: '1px',
-          textTransform: 'uppercase', fontFamily: 'inherit',
-          textDecoration: 'none',
-          display: 'inline-flex', alignItems: 'center',
-          transition: 'border-color 0.2s, color 0.2s',
-        }}>
+        <Link to="/about" style={navBtn(location.pathname === '/about')}>
           Data Sources
         </Link>
 
-        {/* Theme toggle */}
-        <button onClick={toggle} style={{
-          background: 'none',
-          border: `1px solid ${t.panelBorder}`,
-          borderRadius: 5, padding: '3px 10px',
-          cursor: 'pointer', color: t.lblMuted,
-          fontSize: '0.68rem', letterSpacing: '1px',
-          textTransform: 'uppercase', fontFamily: 'inherit',
-          transition: 'border-color 0.2s, color 0.2s',
-        }}>
-          {theme === 'dark' ? '☀ Light' : '◑ Dark'}
-        </button>
+        {/* Contact */}
+        <Link to="/contact" style={navBtn(location.pathname === '/contact')}>
+          Contact
+        </Link>
+
       </div>
     </div>
   );
