@@ -422,16 +422,41 @@ export default function RegionPage() {
 
   // ── Download helpers ──────────────────────────────────────────────────────
 
-  const handleDownloadPlants = useCallback(async () => {
+  const handleDownloadPlants = useCallback(async (format = 'geojson') => {
     const suffix = plantSource === 'gppd' ? '_gppd' : plantSource === 'gem' ? '_gem' : '';
-    const url = `/data/cache/region_plants_${regionId}${suffix}.geojson`;
-    const text = await fetch(url).then(r => r.text());
-    downloadBlob(text, `plants_${regionId}${suffix}.geojson`, 'application/geo+json');
+    const url  = `/data/cache/region_plants_${regionId}${suffix}.geojson`;
+    const data = await fetch(url).then(r => r.json());
+    if (format === 'csv') {
+      const header = 'name,fuel,mw,country,status,lat,lon';
+      const rows = data.features.map(f => {
+        const p = f.properties;
+        const [lon, lat] = f.geometry.coordinates;
+        return [
+          `"${(p.name || '').replace(/"/g, '""')}"`,
+          p.fuel || '', p.mw || '', p.country || '', p.status || '',
+          lat.toFixed(5), lon.toFixed(5),
+        ].join(',');
+      });
+      downloadBlob([header, ...rows].join('\n'), `plants_${regionId}${suffix}.csv`, 'text/csv');
+    } else {
+      downloadBlob(JSON.stringify(data), `plants_${regionId}${suffix}.geojson`, 'application/geo+json');
+    }
   }, [plantSource, regionId]);
 
-  const handleDownloadLines = useCallback(async () => {
-    const text = await fetch(`/data/cache/region_lines_${regionId}.geojson`).then(r => r.text());
-    downloadBlob(text, `lines_${regionId}.geojson`, 'application/geo+json');
+  const handleDownloadLines = useCallback(async (format = 'geojson') => {
+    const url  = `/data/cache/region_lines_${regionId}.geojson`;
+    const data = await fetch(url).then(r => r.json());
+    if (format === 'csv') {
+      const header = 'id,voltage_kv,geometry_wkt';
+      const rows = data.features.map((f, i) => {
+        const vkv   = f.properties.v ? Math.round(f.properties.v / 1000) : '';
+        const wkt   = `LINESTRING(${f.geometry.coordinates.map(([x, y]) => `${x} ${y}`).join(', ')})`;
+        return `${i},${vkv},"${wkt}"`;
+      });
+      downloadBlob([header, ...rows].join('\n'), `lines_${regionId}.csv`, 'text/csv');
+    } else {
+      downloadBlob(JSON.stringify(data), `lines_${regionId}.geojson`, 'application/geo+json');
+    }
   }, [regionId]);
 
   const handleDownloadCapacity = useCallback(() => {

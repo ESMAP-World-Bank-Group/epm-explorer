@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FUEL_COLORS, FUEL_LABELS, VOLTAGE_BRACKETS, getT } from '../constants';
 
 const STATUS_CONFIG = [
@@ -46,6 +47,31 @@ function DownloadIcon() {
   );
 }
 
+function DownloadDropdown({ onDownload, onClose, t }) {
+  return (
+    <div style={{
+      position: 'absolute', right: 0, top: 18, zIndex: 200,
+      backgroundColor: t.panel, border: `1px solid ${t.panelBorder}`,
+      borderRadius: 5, padding: '3px 0', minWidth: 80,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.22)',
+    }}>
+      {[['GeoJSON', 'geojson'], ['CSV', 'csv']].map(([label, fmt]) => (
+        <div key={fmt}
+          onClick={() => { onDownload(fmt); onClose(); }}
+          style={{
+            fontSize: '0.58rem', color: t.lbl, padding: '4px 10px',
+            cursor: 'pointer', letterSpacing: '0.5px',
+          }}
+          onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(128,160,192,0.1)'}
+          onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          {label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function LayerPanel({
   theme,
   fuelsOff, statusOff, kvsOff,
@@ -59,16 +85,12 @@ export default function LayerPanel({
   onDownloadPlants, onDownloadLines,
 }) {
   const t = getT(theme);
+  const [plantsDropOpen, setPlantsDropOpen] = useState(false);
+  const [linesDropOpen,  setLinesDropOpen]  = useState(false);
 
   const sec = {
     fontSize: '0.52rem', letterSpacing: '2.5px',
     fontWeight: 700, color: t.lblMuted, textTransform: 'uppercase',
-  };
-
-  const mutedLabel = {
-    fontSize: '0.52rem', fontWeight: 400,
-    color: t.lblMuted, letterSpacing: '0px',
-    textTransform: 'none', marginLeft: 5,
   };
 
   const inputStyle = {
@@ -88,8 +110,7 @@ export default function LayerPanel({
   const dlIconBtn = {
     background: 'none', border: 'none', cursor: 'pointer',
     padding: '1px 3px', borderRadius: 3, color: t.lblMuted,
-    display: 'inline-flex', alignItems: 'center',
-    opacity: 0.7,
+    display: 'inline-flex', alignItems: 'center', opacity: 0.7,
   };
 
   const SOURCES = [
@@ -106,18 +127,32 @@ export default function LayerPanel({
       borderRight: `1px solid ${t.panelBorder}`,
       flexShrink: 0,
     }}>
+
       {/* ── POWER PLANTS ──────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <span className="layer-row" onClick={onTogglePlants}
           style={{ opacity: plantsOn ? 1 : 0.35, cursor: 'pointer' }}>
           <span style={sec}>Plants</span>
-          <span style={mutedLabel}>existing</span>
         </span>
         {onDownloadPlants && (
-          <button style={dlIconBtn} onClick={e => { e.stopPropagation(); onDownloadPlants(); }}
-            title="Download plants GeoJSON">
-            <DownloadIcon />
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button style={dlIconBtn}
+              onClick={e => { e.stopPropagation(); setPlantsDropOpen(v => !v); setLinesDropOpen(false); }}
+              title="Download plants">
+              <DownloadIcon />
+            </button>
+            {plantsDropOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 199 }}
+                  onClick={() => setPlantsDropOpen(false)} />
+                <DownloadDropdown
+                  onDownload={onDownloadPlants}
+                  onClose={() => setPlantsDropOpen(false)}
+                  t={t}
+                />
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -126,9 +161,9 @@ export default function LayerPanel({
         <>
           <div style={{ display: 'flex', gap: 2, marginBottom: 4 }}>
             {SOURCES.map(({ id, label, avail }) => {
-              const active    = plantSource === id;
-              const unavail   = avail === false;
-              const checking  = avail === null && id !== 'osm';
+              const active   = plantSource === id;
+              const unavail  = avail === false;
+              const checking = avail === null && id !== 'osm';
               return (
                 <button key={id} onClick={() => !unavail && onSourceChange(id)}
                   style={{
@@ -146,11 +181,6 @@ export default function LayerPanel({
               );
             })}
           </div>
-          {gppdAvailable === false && plantSource !== 'gppd' && (
-            <p style={{ fontSize: '0.44rem', color: '#B8860B', fontStyle: 'italic', marginBottom: 4 }}>
-              WRI: run prepare_gppd.py
-            </p>
-          )}
           {gemAvailable === false && (
             <p style={{ fontSize: '0.44rem', color: '#B8860B', fontStyle: 'italic', marginBottom: 4 }}>
               GEM: run prepare_gem.py
@@ -224,13 +254,26 @@ export default function LayerPanel({
         <span className="layer-row" onClick={onToggleLines}
           style={{ opacity: linesOn ? 1 : 0.35, cursor: 'pointer' }}>
           <span style={sec}>Transmission</span>
-          <span style={mutedLabel}>existing</span>
         </span>
         {onDownloadLines && (
-          <button style={dlIconBtn} onClick={e => { e.stopPropagation(); onDownloadLines(); }}
-            title="Download lines GeoJSON">
-            <DownloadIcon />
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button style={dlIconBtn}
+              onClick={e => { e.stopPropagation(); setLinesDropOpen(v => !v); setPlantsDropOpen(false); }}
+              title="Download lines">
+              <DownloadIcon />
+            </button>
+            {linesDropOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 199 }}
+                  onClick={() => setLinesDropOpen(false)} />
+                <DownloadDropdown
+                  onDownload={onDownloadLines}
+                  onClose={() => setLinesDropOpen(false)}
+                  t={t}
+                />
+              </>
+            )}
+          </div>
         )}
       </div>
 
