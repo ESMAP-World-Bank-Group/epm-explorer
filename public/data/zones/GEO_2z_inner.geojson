@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "GEO_2z_inner",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { }, "geometry": { "type": "LineString", "coordinates": [ [ 43.349351514926369, 41.211126755441889 ], [ 43.129678415154729, 42.958891402317704 ] ] } }
+]
+}

@@ -214,6 +214,7 @@ export default function CountryPage() {
       map.addSource('admin1',       { type: 'geojson', data: admin1GJ       });
       const hlFilter = ['==', ['get', 'ISO_A3'], iso];
       map.addSource('zone-fills',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-inner',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource('zone-lines',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
       const tv = getT(theme);
@@ -337,7 +338,7 @@ export default function CountryPage() {
         paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.22 },
       });
       map.addLayer({
-        id: 'zone-borders', type: 'line', source: 'zone-fills',
+        id: 'zone-borders', type: 'line', source: 'zone-inner',
         layout: { visibility: 'none' },
         paint: { 'line-color': '#333', 'line-width': 1.8, 'line-opacity': 0.7 },
       });
@@ -576,10 +577,12 @@ export default function CountryPage() {
     Promise.all([
       fetch(`/data/zones/${label}_zones.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
       fetch(`/data/zones/${label}_topo.json`).then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([zonesGJ, topo]) => {
+      fetch(`/data/zones/${label}_inner.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([zonesGJ, topo, innerGJ]) => {
       if (!zonesGJ || !map.getSource('zone-fills')) return;
       zonesGJ.features.forEach((f, i) => { f.properties.color = COLORS[i % COLORS.length]; });
       map.getSource('zone-fills').setData(zonesGJ);
+      if (innerGJ && map.getSource('zone-inner')) map.getSource('zone-inner').setData(innerGJ);
 
       // Build interzone line geometries from centroids
       const centroids = {};

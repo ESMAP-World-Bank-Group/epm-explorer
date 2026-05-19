@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "BGR_3z_inner",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { }, "geometry": { "type": "LineString", "coordinates": [ [ 27.406230000068756, 44.015230841223399 ], [ 26.562836394159532, 41.964569846667843 ] ] } },
+{ "type": "Feature", "properties": { }, "geometry": { "type": "LineString", "coordinates": [ [ 24.612723509975815, 41.524346797337728 ], [ 24.693126694506702, 43.719828210629302 ] ] } }
+]
+}
