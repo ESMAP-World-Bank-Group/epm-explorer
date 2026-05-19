@@ -8,7 +8,6 @@ import CountryOverview from '../components/CountryOverview';
 import REResourcesTab from '../components/tabs/REResourcesTab';
 import LoadTab from '../components/tabs/LoadTab';
 import ZoningTab from '../components/tabs/ZoningTab';
-import { fetchResourceGrid, SOLAR_COLOR_EXPR, WIND_COLOR_EXPR } from '../utils/nasaPower';
 
 function downloadBlob(content, filename, type = 'application/octet-stream') {
   const blob = new Blob([content], { type });
@@ -83,11 +82,7 @@ export default function CountryPage() {
   const [filteredLinesData,  setFilteredLinesData]  = useState(null);
   const [countryCenter,      setCountryCenter]      = useState(null);
   const [activeTab,          setActiveTab]          = useState('overview');
-  const [resourceOverlay,    setResourceOverlay]    = useState(null);
-  const [mapReady,           setMapReady]           = useState(false);
   const countryFeatureRef  = useRef(null);
-  const countryBoundsRef   = useRef(null); // { south, north, west, east }
-  const resourceCacheRef   = useRef({});
 
   // Static data — fetch once
   useEffect(() => {
@@ -112,8 +107,7 @@ export default function CountryPage() {
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
-    setResourceOverlay(null); setMapReady(false);
-    countryFeatureRef.current = null; countryBoundsRef.current = null; resourceCacheRef.current = {};
+    countryFeatureRef.current = null;
   }, [iso]);
 
   useEffect(() => {
@@ -154,13 +148,10 @@ export default function CountryPage() {
       const bounds = fitBoundsCountry(iso, countries);
       if (bounds) {
         map.fitBounds(bounds, { padding: 60, duration: 0, maxZoom: 9 });
-        const cx = (bounds[0][0] + bounds[1][0]) / 2;
-        const cy = (bounds[0][1] + bounds[1][1]) / 2;
-        setCountryCenter({ lon: cx, lat: cy });
-        countryBoundsRef.current = {
-          south: bounds[0][1], north: bounds[1][1],
-          west:  bounds[0][0], east:  bounds[1][0],
-        };
+        setCountryCenter({
+          lon: (bounds[0][0] + bounds[1][0]) / 2,
+          lat: (bounds[0][1] + bounds[1][1]) / 2,
+        });
       }
 
       // Filter plants strictly inside the country polygon (point-in-polygon)
@@ -243,15 +234,6 @@ export default function CountryPage() {
         paint: { 'line-color': hl.border, 'line-width': hl.borderW + 0.4, 'line-opacity': 0.95 },
       });
 
-      // Resource grid (NASA POWER) — data loaded on demand
-      map.addSource('resource-grid', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({
-        id: 'resource-grid',
-        type: 'fill',
-        source: 'resource-grid',
-        layout: { visibility: 'none' },
-        paint: { 'fill-color': SOLAR_COLOR_EXPR, 'fill-opacity': 0.82 },
-      }, 'country-border');
 
       // Plants
       const fuels = new Set();
@@ -316,7 +298,6 @@ export default function CountryPage() {
       });
       map.on('mouseleave', 'substations', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
 
-      setMapReady(true);
     });
 
     return () => { popup.remove(); mapRef.current?.remove(); };
@@ -448,37 +429,6 @@ export default function CountryPage() {
       .catch(() => setFleetAge(null));
   }, [plantSource, info]);
 
-  // ── Resource overlay (NASA POWER granular grid) ───────────────────────────
-
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-    if (!map.getLayer('resource-grid') || !map.getSource('resource-grid')) return;
-
-    if (resourceOverlay === null) {
-      map.setLayoutProperty('resource-grid', 'visibility', 'none');
-      return;
-    }
-
-    map.setPaintProperty('resource-grid', 'fill-color',
-      resourceOverlay === 'solar' ? SOLAR_COLOR_EXPR : WIND_COLOR_EXPR);
-    map.setLayoutProperty('resource-grid', 'visibility', 'visible');
-
-    if (resourceCacheRef.current[resourceOverlay]) {
-      map.getSource('resource-grid').setData(resourceCacheRef.current[resourceOverlay]);
-      return;
-    }
-
-    const b = countryBoundsRef.current;
-    if (!b) return;
-
-    fetchResourceGrid(b.south, b.north, b.west, b.east, resourceOverlay)
-      .then(grid => {
-        resourceCacheRef.current[resourceOverlay] = grid;
-        if (mapRef.current?.getSource('resource-grid'))
-          mapRef.current.getSource('resource-grid').setData(grid);
-      });
-  }, [resourceOverlay, mapReady]);
 
   // ── Download handlers ────────────────────────────────────────────────────
 
@@ -538,8 +488,6 @@ export default function CountryPage() {
         onSourceChange={setPlantSource}
         onDownloadPlants={handleDownloadPlants}
         onDownloadLines={handleDownloadLines}
-        resourceOverlay={resourceOverlay}
-        onToggleResource={setResourceOverlay}
       />
 
       <div ref={containerRef} style={{ flex: 1, height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />

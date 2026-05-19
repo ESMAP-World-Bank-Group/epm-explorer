@@ -9,7 +9,6 @@ import {
 import LayerPanel from '../components/LayerPanel';
 import CapacityChart from '../components/CapacityChart';
 import StatsPanel from '../components/StatsPanel';
-import { fetchResourceGrid, SOLAR_COLOR_EXPR, WIND_COLOR_EXPR } from '../utils/nasaPower';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,10 +78,6 @@ export default function RegionPage() {
   const [circleScale,   setCircleScale]   = useState(1.0);
   const [plantSource,   setPlantSource]   = useState('osm');
   const [activeTab,     setActiveTab]     = useState('overview');
-  const [resourceOverlay, setResourceOverlay] = useState(null); // null | 'solar' | 'wind'
-  const [mapReady,        setMapReady]        = useState(false);
-  const regionBoundsRef   = useRef(null);  // { south, north, west, east }
-  const resourceCacheRef  = useRef({});    // { solar: GeoJSON, wind: GeoJSON }
 
   // Static data
   useEffect(() => {
@@ -110,8 +105,6 @@ export default function RegionPage() {
     setGemAvailable(null);
     fetch(`/data/cache/region_plants_${regionId}_gem.geojson`, { method: 'HEAD' })
       .then(r => setGemAvailable(r.ok)).catch(() => setGemAvailable(false));
-    setResourceOverlay(null); setMapReady(false);
-    regionBoundsRef.current = null; resourceCacheRef.current = {};
   }, [regionId]);
 
   // Fleet age — GPPD only
@@ -161,13 +154,7 @@ export default function RegionPage() {
       });
 
       const bounds = fitBounds(expandedIsos, countries);
-      if (bounds) {
-        map.fitBounds(bounds, { padding: 40, duration: 0 });
-        regionBoundsRef.current = {
-          south: bounds[0][1] - 1, north: bounds[1][1] + 1,
-          west:  bounds[0][0] - 1, east:  bounds[1][0] + 1,
-        };
-      }
+      if (bounds) map.fitBounds(bounds, { padding: 40, duration: 0 });
 
       map.addSource('countries',   { type: 'geojson', data: countries, generateId: false });
       map.addSource('plants',      { type: 'geojson', data: plantsGJ });
@@ -205,18 +192,6 @@ export default function RegionPage() {
         filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'line-color': hl.border, 'line-width': hl.borderW, 'line-opacity': 0.9 } });
 
-      // Resource grid (NASA POWER) — added as empty source; data loaded on demand
-      map.addSource('resource-grid', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({
-        id: 'resource-grid',
-        type: 'fill',
-        source: 'resource-grid',
-        layout: { visibility: 'none' },
-        paint: {
-          'fill-color': SOLAR_COLOR_EXPR,
-          'fill-opacity': 0.82,
-        },
-      }, 'region-border');
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
       const fuels = new Set();
@@ -327,7 +302,6 @@ export default function RegionPage() {
         if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
       });
 
-      setMapReady(true);
     });
 
     return () => { popup.remove(); mapRef.current?.remove(); };
@@ -449,40 +423,6 @@ export default function RegionPage() {
       });
   }, [plantSource, regionId]);
 
-  // ── Resource overlay (NASA POWER granular grid) ───────────────────────────
-
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-    if (!map.getLayer('resource-grid') || !map.getSource('resource-grid')) return;
-
-    if (resourceOverlay === null) {
-      map.setLayoutProperty('resource-grid', 'visibility', 'none');
-      return;
-    }
-
-    // Switch color expression for this type
-    map.setPaintProperty('resource-grid', 'fill-color',
-      resourceOverlay === 'solar' ? SOLAR_COLOR_EXPR : WIND_COLOR_EXPR);
-    map.setLayoutProperty('resource-grid', 'visibility', 'visible');
-
-    // Serve from cache if available
-    if (resourceCacheRef.current[resourceOverlay]) {
-      map.getSource('resource-grid').setData(resourceCacheRef.current[resourceOverlay]);
-      return;
-    }
-
-    // Fetch NASA POWER grid for the region extent
-    const b = regionBoundsRef.current;
-    if (!b) return;
-
-    fetchResourceGrid(b.south, b.north, b.west, b.east, resourceOverlay)
-      .then(grid => {
-        resourceCacheRef.current[resourceOverlay] = grid;
-        if (mapRef.current?.getSource('resource-grid'))
-          mapRef.current.getSource('resource-grid').setData(grid);
-      });
-  }, [resourceOverlay, mapReady]);
 
   // ── Download helpers ──────────────────────────────────────────────────────
 
@@ -588,8 +528,6 @@ export default function RegionPage() {
         onSourceChange={setPlantSource}
         onDownloadPlants={handleDownloadPlants}
         onDownloadLines={handleDownloadLines}
-        resourceOverlay={resourceOverlay}
-        onToggleResource={setResourceOverlay}
       />
 
       <div ref={containerRef}
