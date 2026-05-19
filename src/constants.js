@@ -69,6 +69,16 @@ export function mapStyle(theme) {
   };
 }
 
+export const PLANT_STATUSES = ['operating', 'construction', 'planned'];
+
+/** MapLibre match expression: feature fuel property → hex color */
+export function fuelColorExpr() {
+  return ['match', ['get', 'fuel'],
+    ...Object.entries(FUEL_COLORS).flatMap(([f, c]) => [f, c]),
+    '#888888',
+  ];
+}
+
 /** MapLibre circle-radius expression based on MW, scaled by a multiplier */
 export function plantRadiusExpr(scale = 1) {
   return [

@@ -44,6 +44,7 @@ for src_path in (SRC / "cache").glob("region_plants_*.json"):
                     "fuel":    (p.get("fuel") or "unknown").split(";")[0].strip().lower(),
                     "mw":      _safe_mw(p.get("mw")),
                     "country": p.get("country") or "",
+                    "status":  p.get("status") or "operating",
                 },
             }
             for i, p in enumerate(plants)
