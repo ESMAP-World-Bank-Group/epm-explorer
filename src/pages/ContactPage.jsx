@@ -125,7 +125,7 @@ export default function ContactPage() {
                   planning studies. This explorer is the geospatial front-end for visualizing
                   model inputs and country context. Scenario results and planning analytics available via the EPM Suite.
                 </p>
-                <a href="https://esmap-world-bank-group.github.io/EPM_main/"
+                <a href="https://esmap-world-bank-group.github.io/EPM/introduction/introduction/"
                   target="_blank" rel="noopener noreferrer" style={{
                     fontSize: '0.62rem', color: 'rgba(74,143,204,0.88)',
                     border: '1px solid rgba(74,143,204,0.3)', borderRadius: 4,
@@ -146,7 +146,7 @@ export default function ContactPage() {
         </div>
 
         {/* Footer — discreet email */}
-        <p style={{ fontSize: '0.55rem', color: t.lblMuted, opacity: 0.6, lineHeight: 1.7 }}>
+        <p style={{ fontSize: '0.65rem', color: t.lblMuted, opacity: 0.6, lineHeight: 1.7 }}>
           Questions or feedback ·{' '}
           <a href="mailto:mbaronnet@worldbank.org" style={{ color: 'inherit', textDecoration: 'none' }}
             onMouseOver={e => e.currentTarget.style.textDecoration = 'underline'}
