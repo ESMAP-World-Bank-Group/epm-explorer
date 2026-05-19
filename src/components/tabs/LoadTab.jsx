@@ -24,17 +24,18 @@ const ENTSOE_ISO3 = new Set(['ROU','BGR','TUR','ALB','BIH','MKD','MNE','SRB','KO
 // Representative 24h weekday profiles (0–100 normalised)
 // European: morning + evening double peak
 const PROFILE_EUROPEAN  = [42,38,35,33,32,33,38,56,75,82,85,86,87,87,85,83,84,88,93,96,91,78,65,52];
-// Developing/tropical: single broad evening peak, lower overnight
-const PROFILE_TROPICAL  = [38,34,31,29,28,29,34,52,68,70,70,67,64,61,59,58,62,66,76,84,87,81,70,52];
-// Arid/Gulf: high midday cooling demand
-const PROFILE_ARID      = [48,44,40,37,35,36,42,55,65,70,74,78,82,83,80,76,72,70,72,74,73,68,62,54];
-
-const GULF_ISO3 = new Set(['SAU','ARE','QAT','BHR','KWT','OMN','IRQ']);
 
 function getProfile(iso) {
-  if (GULF_ISO3.has(iso))   return { data: PROFILE_ARID,     label: 'Representative weekday · arid/Gulf (ESMAP reference)' };
   if (ENTSOE_ISO3.has(iso)) return { data: PROFILE_EUROPEAN, label: 'Typical weekday · European grid (ENTSO-E shape)' };
-  return                           { data: PROFILE_TROPICAL,  label: 'Representative weekday · developing country (ESMAP reference)' };
+  return null;
+}
+
+function downloadBlob(content, filename, type = 'application/octet-stream') {
+  const blob = new Blob([content], { type });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function linearFit(pts) {
@@ -183,7 +184,7 @@ export default function LoadTab({ iso, theme }) {
     if (v0 > 0 && n > 0) cagr = ((Math.pow(v1 / v0, 1 / n) - 1) * 100).toFixed(1);
   }
 
-  const { data: profileData, label: profileLabel } = getProfile(iso);
+  const profile = getProfile(iso);
 
   const sec = {
     fontSize: '0.45rem', letterSpacing: '2px', fontWeight: 700,
@@ -227,17 +228,47 @@ export default function LoadTab({ iso, theme }) {
               {legend('#4DABF7', null,  'Historical (WB WDI)')}
               {legend('#4DABF7', '4,3', 'Linear extrap.')}
             </div>
-            {cagr != null && (
-              <div style={{
-                fontSize: '0.55rem', color: parseFloat(cagr) >= 0 ? '#40C057' : '#F03E3E',
-                fontWeight: 700, letterSpacing: '0.3px',
-              }}>
-                {parseFloat(cagr) >= 0 ? '+' : ''}{cagr}%
-                <span style={{ fontSize: '0.44rem', color: t.lblMuted, fontWeight: 400, marginLeft: 2 }}>
-                  CAGR
-                </span>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {cagr != null && (
+                <div style={{
+                  fontSize: '0.55rem', color: parseFloat(cagr) >= 0 ? '#40C057' : '#F03E3E',
+                  fontWeight: 700, letterSpacing: '0.3px',
+                }}>
+                  {parseFloat(cagr) >= 0 ? '+' : ''}{cagr}%
+                  <span style={{ fontSize: '0.44rem', color: t.lblMuted, fontWeight: 400, marginLeft: 2 }}>
+                    CAGR
+                  </span>
+                </div>
+              )}
+              {historical.length > 0 && (
+                <button
+                  title="Download CSV"
+                  onClick={() => {
+                    const allRows = [
+                      ...historical.map(([year, val]) => `${year},${val},historical`),
+                      ...projected.map(([year, val]) => `${year},${val},projected`),
+                    ];
+                    downloadBlob(
+                      ['year,kwh_per_capita,type', ...allRows].join('\n'),
+                      `electricity_consumption_${iso}.csv`,
+                      'text/csv'
+                    );
+                  }}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '1px 3px', borderRadius: 3, color: t.lblMuted,
+                    display: 'inline-flex', alignItems: 'center', opacity: 0.7,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 3, fontStyle: 'italic', marginBottom: 14 }}>
             Source: World Bank WDI · EG.USE.ELEC.KH.PC ·{' '}
@@ -249,10 +280,23 @@ export default function LoadTab({ iso, theme }) {
       {/* ── Daily load profile ────────────────── */}
       <div style={{ borderTop: `1px solid ${t.panelBorder}`, paddingTop: 10 }}>
         <span style={sec}>Daily Load Profile</span>
-        <ProfileChart profile={profileData} color="#74C0FC" t={t} />
-        <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic', lineHeight: 1.5 }}>
-          {profileLabel}
-        </p>
+        {profile ? (
+          <>
+            <ProfileChart profile={profile.data} color="#74C0FC" t={t} />
+            <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic', lineHeight: 1.5 }}>
+              {profile.label}
+            </p>
+          </>
+        ) : (
+          <p style={{ fontSize: '0.62rem', color: t.muted, fontStyle: 'italic', lineHeight: 1.55 }}>
+            Representative load profiles are not available for this country.{' '}
+            <a href="https://transparency.entsoe.eu" target="_blank" rel="noopener noreferrer"
+              style={{ color: 'rgba(74,143,204,0.75)', textDecoration: 'none' }}>
+              ENTSO-E
+            </a>
+            {' '}data covers European countries only.
+          </p>
+        )}
       </div>
     </div>
   );

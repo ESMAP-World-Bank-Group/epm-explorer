@@ -83,6 +83,7 @@ export default function LayerPanel({
   onToggleKv, onToggleLines, onTogglePlants, onToggleSubs,
   onMinMwChange, onCircleScaleChange, onSourceChange,
   onDownloadPlants, onDownloadLines,
+  resourceOverlay, onToggleResource,
 }) {
   const t = getT(theme);
   const [plantsDropOpen, setPlantsDropOpen] = useState(false);
@@ -305,6 +306,63 @@ export default function LayerPanel({
           }} />
           <span style={{ fontSize: '0.62rem', color: t.lblRow }}>Substations</span>
         </div>
+      )}
+
+      {/* ── RESOURCE OVERLAY ──────────────────────── */}
+      {onToggleResource && (
+        <>
+          <hr style={{ borderColor: 'rgba(128,160,192,0.18)', margin: '10px 0 8px' }} />
+          <span style={{ ...sec, display: 'block', marginBottom: 6 }}>Resource Overlay</span>
+          <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
+            {[
+              { id: null,    label: 'Off'   },
+              { id: 'solar', label: 'Solar' },
+              { id: 'wind',  label: 'Wind'  },
+            ].map(({ id, label }) => {
+              const active = resourceOverlay === id;
+              return (
+                <button key={String(id)} onClick={() => onToggleResource(id)}
+                  style={{
+                    flex: 1, fontSize: '0.45rem', letterSpacing: '0.5px',
+                    textTransform: 'uppercase', fontFamily: 'inherit',
+                    padding: '2px 0', borderRadius: 3,
+                    cursor: 'pointer',
+                    border: `1px solid ${active ? 'rgba(128,160,192,0.6)' : 'rgba(128,160,192,0.18)'}`,
+                    backgroundColor: active ? 'rgba(128,160,192,0.15)' : 'transparent',
+                    color: active ? t.lbl : t.lblMuted,
+                  }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {resourceOverlay === 'solar' && (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{
+                width: '100%', height: 6, borderRadius: 3,
+                background: 'linear-gradient(to right, #FFF9C4, #FFE082, #FFA726, #FF5722, #B71C1C)',
+              }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                <span style={{ fontSize: '0.42rem', color: t.lblMuted }}>700</span>
+                <span style={{ fontSize: '0.42rem', color: t.lblMuted, textAlign: 'center' }}>kWh/m²/yr (GHI)</span>
+                <span style={{ fontSize: '0.42rem', color: t.lblMuted }}>2600</span>
+              </div>
+            </div>
+          )}
+          {resourceOverlay === 'wind' && (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{
+                width: '100%', height: 6, borderRadius: 3,
+                background: 'linear-gradient(to right, #EBF5FB, #85C1E9, #2E86C1, #1A5276)',
+              }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                <span style={{ fontSize: '0.42rem', color: t.lblMuted }}>3</span>
+                <span style={{ fontSize: '0.42rem', color: t.lblMuted, textAlign: 'center' }}>m/s @ 100m</span>
+                <span style={{ fontSize: '0.42rem', color: t.lblMuted }}>10+</span>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

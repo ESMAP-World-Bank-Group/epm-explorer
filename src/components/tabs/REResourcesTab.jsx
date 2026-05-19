@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 import { getT } from '../../constants';
 
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function downloadBlob(content, filename, type = 'application/octet-stream') {
+  const blob = new Blob([content], { type });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 const DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const HELLMAN = 0.143; // open terrain height exponent
 
@@ -178,13 +186,53 @@ export default function REResourcesTab({ center, theme }) {
           </div>
           <span style={{ ...sec, marginBottom: 4 }}>Monthly GHI</span>
           <LineChart data={solar.monthlyGhiDaily} color="#FFD43B" yUnit="kWh/m²/d" t={t} />
-          <p style={{ fontSize: '0.44rem', color: t.lblMuted, marginTop: 3, fontStyle: 'italic', marginBottom: 14 }}>
-            Source:{' '}
-            <a href="https://globalsolaratlas.info" target="_blank" rel="noopener noreferrer"
-              style={{ color: 'rgba(74,143,204,0.75)', textDecoration: 'none' }}>
-              Global Solar Atlas
-            </a>{' '}(ESMAP / World Bank)
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3, marginBottom: 14 }}>
+            <p style={{ fontSize: '0.44rem', color: t.lblMuted, fontStyle: 'italic', margin: 0 }}>
+              Source:{' '}
+              <a href="https://globalsolaratlas.info" target="_blank" rel="noopener noreferrer"
+                style={{ color: 'rgba(74,143,204,0.75)', textDecoration: 'none' }}>
+                Global Solar Atlas
+              </a>{' '}(ESMAP / World Bank)
+            </p>
+            {(solar || wind) && (
+              <button
+                title="Download RE data CSV"
+                onClick={() => {
+                  const rows = [];
+                  rows.push('type,metric,value,unit');
+                  if (solar) {
+                    rows.push(`solar,GHI,${solar.ghi ?? ''},kWh/m²/yr`);
+                    rows.push(`solar,DNI,${solar.dni ?? ''},kWh/m²/yr`);
+                    rows.push(`solar,PVOUT,${solar.pvout ?? ''},kWh/kWp/yr`);
+                    rows.push(`solar,CF,${solar.cf ?? ''},%`);
+                    (solar.monthlyGhiDaily || []).forEach((v, i) => {
+                      rows.push(`solar_monthly,GHI_daily_${MONTH_LABELS[i]},${v ?? ''},kWh/m²/d`);
+                    });
+                  }
+                  if (wind) {
+                    rows.push(`wind,mean_100m,${wind.mean100m ?? ''},m/s`);
+                    (wind.monthly100m || []).forEach((v, i) => {
+                      rows.push(`wind_monthly,speed_100m_${MONTH_LABELS[i]},${v ?? ''},m/s`);
+                    });
+                  }
+                  downloadBlob(rows.join('\n'), `re_resources_${center?.lat?.toFixed(2)}_${center?.lon?.toFixed(2)}.csv`, 'text/csv');
+                }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '1px 3px', borderRadius: 3, color: t.lblMuted,
+                  display: 'inline-flex', alignItems: 'center', opacity: 0.7,
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
+            )}
+          </div>
         </>
       )}
 

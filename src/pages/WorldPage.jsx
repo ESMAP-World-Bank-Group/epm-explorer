@@ -196,7 +196,7 @@ export default function WorldPage() {
       {/* Region legend */}
       {regions && (
         <div style={{
-          position: 'absolute', bottom: 24, left: 24,
+          position: 'absolute', bottom: 70, left: 24,
           backgroundColor: t.panel, border: `1px solid ${t.panelBorder}`,
           borderRadius: 8, padding: '12px 14px',
           display: 'flex', flexDirection: 'column', gap: 7,

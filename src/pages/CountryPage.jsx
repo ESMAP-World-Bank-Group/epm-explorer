@@ -17,6 +17,23 @@ function downloadBlob(content, filename, type = 'application/octet-stream') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function lerpRGB([r1,g1,b1], [r2,g2,b2], t) {
+  return `rgb(${Math.round(r1+t*(r2-r1))},${Math.round(g1+t*(g2-g1))},${Math.round(b1+t*(b2-b1))})`;
+}
+function clamp01(t) { return Math.max(0, Math.min(1, t)); }
+function solarColor(ghi) {
+  const stops = [[255,249,196],[255,224,130],[255,167,38],[255,87,34],[183,28,28]];
+  const t = clamp01((ghi - 700) / 1900) * (stops.length - 1);
+  const i = Math.min(Math.floor(t), stops.length - 2);
+  return lerpRGB(stops[i], stops[i+1], t - i);
+}
+function windColor(v100) {
+  const stops = [[235,245,251],[133,193,233],[46,134,193],[26,82,118]];
+  const t = clamp01((v100 - 3) / 7) * (stops.length - 1);
+  const i = Math.min(Math.floor(t), stops.length - 2);
+  return lerpRGB(stops[i], stops[i+1], t - i);
+}
+
 // Ray-casting point-in-polygon (handles Polygon + MultiPolygon)
 function pointInRing(pt, ring) {
   let inside = false;
@@ -82,6 +99,8 @@ export default function CountryPage() {
   const [filteredLinesData,  setFilteredLinesData]  = useState(null);
   const [countryCenter,      setCountryCenter]      = useState(null);
   const [activeTab,          setActiveTab]          = useState('overview');
+  const [resourceOverlay,    setResourceOverlay]    = useState(null);
+  const [mapReady,           setMapReady]           = useState(false);
   const countryFeatureRef = useRef(null);
 
   // Static data — fetch once
@@ -107,6 +126,7 @@ export default function CountryPage() {
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
+    setResourceOverlay(null); setMapReady(false);
     countryFeatureRef.current = null;
   }, [iso]);
 
@@ -296,6 +316,8 @@ export default function CountryPage() {
         popup.setLngLat(e.features[0].geometry.coordinates).setHTML(`${name}<span style="opacity:.75">Substation${kv ? ' · ' + kv : ''}</span>`).addTo(map);
       });
       map.on('mouseleave', 'substations', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
+
+      setMapReady(true);
     });
 
     return () => { popup.remove(); mapRef.current?.remove(); };
@@ -427,6 +449,54 @@ export default function CountryPage() {
       .catch(() => setFleetAge(null));
   }, [plantSource, info]);
 
+  // ── Resource overlay ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !countryCenter) return;
+    const map = mapRef.current;
+    if (!map.getLayer('country-fill')) return;
+
+    const HELLMAN = 0.143;
+    const hl = HIGHLIGHT[theme] || HIGHLIGHT.dark;
+
+    if (resourceOverlay === null) {
+      map.setPaintProperty('country-fill', 'fill-color', hl.fill);
+      map.setPaintProperty('country-fill', 'fill-opacity', 1.0);
+      return;
+    }
+
+    const { lat, lon } = countryCenter;
+
+    if (resourceOverlay === 'solar') {
+      fetch(`https://api.globalsolaratlas.info/data/lta?loc=${lat.toFixed(4)},${lon.toFixed(4)}`)
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(d => {
+          const ghi = d.annual?.data?.GHI;
+          if (ghi == null || !mapRef.current?.getLayer('country-fill')) return;
+          mapRef.current.setPaintProperty('country-fill', 'fill-color', solarColor(ghi));
+          mapRef.current.setPaintProperty('country-fill', 'fill-opacity', 0.82);
+        })
+        .catch(() => {});
+    } else if (resourceOverlay === 'wind') {
+      fetch(
+        `https://archive-api.open-meteo.com/v1/archive?` +
+        `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
+        `&start_date=2019-01-01&end_date=2023-12-31&monthly=wind_speed_10m`
+      )
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(d => {
+          const speeds = d.monthly?.wind_speed_10m || [];
+          const valid = speeds.filter(v => v != null);
+          if (!valid.length || !mapRef.current?.getLayer('country-fill')) return;
+          const mean10m = valid.reduce((s, v) => s + v, 0) / valid.length;
+          const mean100m = mean10m * Math.pow(100 / 10, HELLMAN);
+          mapRef.current.setPaintProperty('country-fill', 'fill-color', windColor(mean100m));
+          mapRef.current.setPaintProperty('country-fill', 'fill-opacity', 0.82);
+        })
+        .catch(() => {});
+    }
+  }, [resourceOverlay, mapReady, countryCenter, theme]);
+
   // ── Download handlers ────────────────────────────────────────────────────
 
   const handleDownloadPlants = useCallback((format = 'geojson') => {
@@ -485,6 +555,8 @@ export default function CountryPage() {
         onSourceChange={setPlantSource}
         onDownloadPlants={handleDownloadPlants}
         onDownloadLines={handleDownloadLines}
+        resourceOverlay={resourceOverlay}
+        onToggleResource={setResourceOverlay}
       />
 
       <div ref={containerRef} style={{ flex: 1, height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
