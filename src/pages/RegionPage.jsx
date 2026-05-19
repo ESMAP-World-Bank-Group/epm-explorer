@@ -397,6 +397,22 @@ export default function RegionPage() {
     const map = mapRef.current;
     if (!map?.getLayer('region-zones-fill')) return;
     const showZones = mapMode === 'zones';
+
+    // Swap land background resolution to match zone detail
+    const landUrl = refineMode && showZones
+      ? '/data/countries_10m.geojson'
+      : '/data/countries_110m.geojson';
+    fetch(landUrl).then(r => r.json()).then(data => {
+      data.features.forEach((f, i) => {
+        const p = f.properties;
+        let iso = p.ISO_A3 || '-99';
+        if (iso === '-99') iso = p.ISO_A3_EH || '-99';
+        if (iso === '-99') iso = p.ADM0_A3 || '-99';
+        p.ISO_A3 = iso; f.id = i;
+      });
+      mapRef.current?.getSource('countries')?.setData(data);
+    }).catch(() => {});
+
     if (showZones) {
       const url = refineMode
         ? `/data/zones/${regionId}_preferred_zones_hd.geojson`
