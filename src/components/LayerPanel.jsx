@@ -344,7 +344,7 @@ export default function LayerPanel({
           style={{ marginTop: 6, opacity: subsOn ? 1 : 0.22 }}>
           <span style={{
             display: 'inline-block', width: 5, height: 5, borderRadius: 1,
-            backgroundColor: theme === 'dark' ? 'rgba(200,220,240,0.55)' : 'rgba(40,50,60,0.45)',
+            backgroundColor: t.isDark ? 'rgba(200,220,240,0.55)' : 'rgba(40,50,60,0.45)',
             marginRight: 8, flexShrink: 0,
           }} />
           <span style={{ fontSize: '0.62rem', color: t.lblRow }}>Substations</span>

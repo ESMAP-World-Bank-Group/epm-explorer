@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
-import { getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr, lcRadiusExpr } from '../constants';
+import { getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, plantRadiusExpr, lcRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CountryOverview from '../components/CountryOverview';
 import REResourcesTab from '../components/tabs/REResourcesTab';
@@ -238,13 +238,13 @@ export default function CountryPage() {
           filter: kvFilters[key],
           paint: {
             'line-color': color, 'line-width': width,
-            'line-opacity': theme === 'dark' ? 0.88 : 0.65,
+            'line-opacity': tv.isDark ? 0.88 : 0.65,
           },
         });
       }
 
       // Country highlight — light fill + border on current country
-      const hl = HIGHLIGHT[theme] || HIGHLIGHT.dark;
+      const hl = tv.highlight;
       map.addLayer({
         id: 'country-fill',
         type: 'fill',
@@ -320,7 +320,7 @@ export default function CountryPage() {
       const sqData = new Uint8Array(sqSz * sqSz * 4);
       for (let i = 0; i < sqSz * sqSz; i++) {
         sqData[i * 4] = 105; sqData[i * 4 + 1] = 105; sqData[i * 4 + 2] = 105;
-        sqData[i * 4 + 3] = theme === 'dark' ? 160 : 130;
+        sqData[i * 4 + 3] = tv.isDark ? 160 : 130;
       }
       map.addImage('sub-sq', { width: sqSz, height: sqSz, data: sqData });
       map.addLayer({

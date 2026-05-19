@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
 import {
-  getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT,
+  getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS,
   plantRadiusExpr, lcRadiusExpr, fuelColorExpr, PLANT_STATUSES,
 } from '../constants';
 import LayerPanel from '../components/LayerPanel';
@@ -188,11 +188,11 @@ export default function RegionPage() {
         map.addLayer({ id: `lines-${key}`, type: 'line', source: 'lines',
           filter: kvFilters[key],
           paint: { 'line-color': color, 'line-width': width,
-            'line-opacity': theme === 'dark' ? 0.88 : 0.65 } });
+            'line-opacity': tv.isDark ? 0.88 : 0.65 } });
       }
 
       // Region highlight
-      const hl = HIGHLIGHT[theme] || HIGHLIGHT.dark;
+      const hl = tv.highlight;
       map.addLayer({ id: 'region-fill', type: 'fill', source: 'countries',
         filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'fill-color': hl.fill,
@@ -273,7 +273,7 @@ export default function RegionPage() {
       const sqData = new Uint8Array(sqSz * sqSz * 4);
       for (let i = 0; i < sqSz * sqSz; i++) {
         sqData[i*4] = 105; sqData[i*4+1] = 105; sqData[i*4+2] = 105;
-        sqData[i*4+3] = theme === 'dark' ? 160 : 130;
+        sqData[i*4+3] = tv.isDark ? 160 : 130;
       }
       map.addImage('sub-sq', { width: sqSz, height: sqSz, data: sqData });
       map.addLayer({ id: 'substations', type: 'symbol', source: 'substations',

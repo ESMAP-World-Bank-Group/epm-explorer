@@ -8,15 +8,15 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import { getT } from './constants';
 
-export const ThemeCtx = createContext({ theme: 'dark', toggle: () => {} });
+export const ThemeCtx = createContext({ theme: 'fog', setTheme: () => {} });
 export const useTheme = () => useContext(ThemeCtx);
 
 export default function App() {
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState('fog');
   const t = getT(theme);
 
   return (
-    <ThemeCtx.Provider value={{ theme, toggle: () => setTheme(s => s === 'dark' ? 'light' : 'dark') }}>
+    <ThemeCtx.Provider value={{ theme, setTheme }}>
       <BrowserRouter>
         <div style={{
           display: 'flex', flexDirection: 'column', height: '100vh',

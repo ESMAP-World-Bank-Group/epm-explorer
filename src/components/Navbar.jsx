@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../App';
-import { getT } from '../constants';
+import { getT, THEME_LIST, THEMES } from '../constants';
 import { useEffect, useState, useMemo } from 'react';
 
 const EPM_DASHBOARD_URL = 'https://epm-dashboard.onrender.com';
@@ -38,7 +38,7 @@ function useBreadcrumb() {
 }
 
 export default function Navbar() {
-  const { theme, toggle } = useTheme();
+  const { theme, setTheme } = useTheme();
   const t = getT(theme);
   const crumb = useBreadcrumb();
   const location = useLocation();
@@ -111,10 +111,24 @@ export default function Navbar() {
       {/* Right: theme toggle | EPM Suite | Data Sources | Contact */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
 
-        {/* Theme toggle */}
-        <button onClick={toggle} style={navBtn()}>
-          {theme === 'dark' ? '☀ Light' : '◑ Dark'}
-        </button>
+        {/* Theme swatches */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginRight: 2 }}>
+          {THEME_LIST.map(id => {
+            const th = THEMES[id];
+            const active = theme === id;
+            return (
+              <button key={id} title={th.label} onClick={() => setTheme(id)} style={{
+                width: 15, height: 15, borderRadius: '50%', padding: 0, cursor: 'pointer',
+                backgroundColor: th.swatch,
+                border: active ? `2px solid ${t.lbl}` : `1px solid ${t.panelBorder}`,
+                boxShadow: active ? '0 0 0 1px rgba(128,160,192,0.35)' : 'none',
+                transform: active ? 'scale(1.25)' : 'scale(1)',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+                flexShrink: 0,
+              }} />
+            );
+          })}
+        </div>
 
         {/* EPM Suite */}
         <div style={{ position: 'relative' }}>

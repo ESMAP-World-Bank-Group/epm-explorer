@@ -1,14 +1,14 @@
 export const FUEL_COLORS = {
   solar:      '#FFD43B',
-  wind:       '#66D9E8',   // cyan sky, distinct from coal grey and hydro blue
+  wind:       '#66D9E8',
   hydro:      '#4DABF7',
-  gas:        '#8B4513',   // saddlebrown
+  gas:        '#8B4513',
   coal:       '#868E96',
-  nuclear:    '#FF6B00',   // flashy orange
-  oil:        '#4A4240',   // very dark brown-grey
+  nuclear:    '#FF6B00',
+  oil:        '#4A4240',
   biomass:    '#40C057',
-  geothermal: '#B8860B',   // darkgoldenrod
-  diesel:     '#3C3C3C',   // dimgrey almost black
+  geothermal: '#B8860B',
+  diesel:     '#3C3C3C',
   waste:      '#ADB5BD',
   biogas:     '#69DB7C',
   wood:       '#66A80F',
@@ -22,63 +22,111 @@ export const FUEL_LABELS = {
 };
 
 export const VOLTAGE_BRACKETS = [
-  { min: 500_000, color: '#F0A500', width: 2.2,  label: '500 kV+',    key: '500' },  // bright gold
-  { min: 330_000, color: '#D4780C', width: 1.5,  label: '330–500 kV', key: '330' },  // deep amber
-  { min: 220_000, color: '#A85C18', width: 1.0,  label: '220–330 kV', key: '220' },  // bronze
-  { min: 0,       color: '#704020', width: 0.65, label: '110–220 kV', key: '110' },  // dark bronze
+  { min: 500_000, color: '#F0A500', width: 2.2,  label: '500 kV+',    key: '500' },
+  { min: 330_000, color: '#D4780C', width: 1.5,  label: '330–500 kV', key: '330' },
+  { min: 220_000, color: '#A85C18', width: 1.0,  label: '220–330 kV', key: '220' },
+  { min: 0,       color: '#704020', width: 0.65, label: '110–220 kV', key: '110' },
 ];
 
-// Neutral highlight for country/region fills on the map (independent of region accent color)
-export const HIGHLIGHT = {
-  dark:  { fill: 'rgba(55,110,185,1)',  border: 'rgba(130,200,255,0.75)', borderW: 1.2 },
-  light: { fill: 'rgba(95,130,170,1)',  border: 'rgba(65,100,145,0.75)',  borderW: 1.0 },
+export const THEMES = {
+  fog: {
+    isDark: false, label: 'Fog', swatch: '#D8E2EC', cartoBg: 'light_all', cartoLabels: 'light_only_labels',
+    bg: '#EEF3F7', land: '#D8E2EC',
+    panel: '#FFFFFF', panelBorder: '#DEE5EE',
+    text: '#2C3E52', muted: '#7A9AB0',
+    hr: '#E8EDF2', cardBg: '#F5F7FA', cardBorder: '#DEE5EE',
+    lbl: '#2C3E52', lblMuted: '#7A9AB0', lblRow: '#3A5A78',
+    worldBdr: 'rgba(160,180,200,0.7)', worldBdrW: 0.4,
+    rgnBdr: 'rgba(80,105,140,0.75)', rgnBdrW: 1.0, rgnOp: 0.28,
+    navBg: '#F5F7FA',
+    highlight: { fill: 'rgba(95,130,170,1)', border: 'rgba(65,100,145,0.75)', borderW: 1.0 },
+  },
+  slate: {
+    isDark: true, label: 'Slate', swatch: '#0E1B2E', cartoBg: 'dark_all', cartoLabels: 'dark_only_labels',
+    bg: '#060B17', land: '#0E1B2E',
+    panel: '#0A1828', panelBorder: '#1A3A54',
+    text: '#C8DFF0', muted: '#5A8AAA',
+    hr: '#1A3A54', cardBg: '#060B17', cardBorder: '#1A3A54',
+    lbl: '#A8C8E0', lblMuted: '#4A7A9A', lblRow: '#8BBDD8',
+    worldBdr: 'rgba(55,100,155,0.5)', worldBdrW: 0.5,
+    rgnBdr: 'rgba(200,225,255,0.65)', rgnBdrW: 1.1, rgnOp: 0.30,
+    navBg: '#070D1B',
+    highlight: { fill: 'rgba(55,110,185,1)', border: 'rgba(130,200,255,0.75)', borderW: 1.2 },
+  },
+  ink: {
+    isDark: true, label: 'Ink', swatch: '#252830', cartoBg: 'dark_all', cartoLabels: 'dark_only_labels',
+    bg: '#0D0E12', land: '#16181F',
+    panel: '#111318', panelBorder: '#252830',
+    text: '#E8EAF0', muted: '#6B6E82',
+    hr: '#252830', cardBg: '#0D0E12', cardBorder: '#252830',
+    lbl: '#C8CBD8', lblMuted: '#555870', lblRow: '#A8ABB8',
+    worldBdr: 'rgba(80,85,110,0.5)', worldBdrW: 0.5,
+    rgnBdr: 'rgba(180,185,210,0.60)', rgnBdrW: 1.1, rgnOp: 0.25,
+    navBg: '#0A0B0F',
+    highlight: { fill: 'rgba(120,130,200,1)', border: 'rgba(160,170,240,0.80)', borderW: 1.2 },
+  },
+  paper: {
+    isDark: false, label: 'Paper', swatch: '#E8E0CC', cartoBg: 'light_all', cartoLabels: 'light_only_labels',
+    bg: '#F5F0E8', land: '#E8E0CC',
+    panel: '#FBF8F2', panelBorder: '#DDD5C4',
+    text: '#2A2218', muted: '#8A7A64',
+    hr: '#DDD5C4', cardBg: '#F5F0E8', cardBorder: '#DDD5C4',
+    lbl: '#2A2218', lblMuted: '#8A7A64', lblRow: '#4A3828',
+    worldBdr: 'rgba(140,120,90,0.55)', worldBdrW: 0.4,
+    rgnBdr: 'rgba(100,80,50,0.65)', rgnBdrW: 1.0, rgnOp: 0.25,
+    navBg: '#F0E8D8',
+    highlight: { fill: 'rgba(160,120,70,1)', border: 'rgba(120,85,40,0.75)', borderW: 1.0 },
+  },
+  forest: {
+    isDark: true, label: 'Forest', swatch: '#0F2014', cartoBg: 'dark_all', cartoLabels: 'dark_only_labels',
+    bg: '#08120A', land: '#0F2014',
+    panel: '#0C1810', panelBorder: '#1C3824',
+    text: '#C0DCC4', muted: '#508058',
+    hr: '#1C3824', cardBg: '#08120A', cardBorder: '#1C3824',
+    lbl: '#A0C8A8', lblMuted: '#407048', lblRow: '#80B090',
+    worldBdr: 'rgba(40,100,55,0.55)', worldBdrW: 0.5,
+    rgnBdr: 'rgba(150,220,165,0.60)', rgnBdrW: 1.1, rgnOp: 0.28,
+    navBg: '#060E08',
+    highlight: { fill: 'rgba(60,180,90,1)', border: 'rgba(100,220,130,0.75)', borderW: 1.2 },
+  },
+  dusk: {
+    isDark: true, label: 'Dusk', swatch: '#1A1530', cartoBg: 'dark_all', cartoLabels: 'dark_only_labels',
+    bg: '#0E0A1A', land: '#1A1530',
+    panel: '#120E20', panelBorder: '#2A2448',
+    text: '#D8D4F0', muted: '#7870A0',
+    hr: '#2A2448', cardBg: '#0E0A1A', cardBorder: '#2A2448',
+    lbl: '#B8B4E0', lblMuted: '#605890', lblRow: '#9890C8',
+    worldBdr: 'rgba(80,70,130,0.55)', worldBdrW: 0.5,
+    rgnBdr: 'rgba(180,170,240,0.60)', rgnBdrW: 1.1, rgnOp: 0.28,
+    navBg: '#0A0814',
+    highlight: { fill: 'rgba(140,100,220,1)', border: 'rgba(180,150,255,0.75)', borderW: 1.2 },
+  },
 };
 
-export const DARK = {
-  bg: '#060B17', land: '#0E1B2E',
-  panel: '#0A1828', panelBorder: '#1A3A54',
-  text: '#C8DFF0', muted: '#5A8AAA',
-  hr: '#1A3A54', cardBg: '#060B17', cardBorder: '#1A3A54',
-  lbl: '#A8C8E0', lblMuted: '#4A7A9A', lblRow: '#8BBDD8',
-  worldBdr: 'rgba(55,100,155,0.5)', worldBdrW: 0.5,
-  rgnBdr: 'rgba(200,225,255,0.65)', rgnBdrW: 1.1, rgnOp: 0.30,
-  navBg: '#070D1B',
-};
-
-export const LIGHT = {
-  bg: '#EEF3F7', land: '#D8E2EC',
-  panel: '#FFFFFF', panelBorder: '#DEE5EE',
-  text: '#2C3E52', muted: '#7A9AB0',
-  hr: '#E8EDF2', cardBg: '#F5F7FA', cardBorder: '#DEE5EE',
-  lbl: '#2C3E52', lblMuted: '#7A9AB0', lblRow: '#3A5A78',
-  worldBdr: 'rgba(160,180,200,0.7)', worldBdrW: 0.4,
-  rgnBdr: 'rgba(80,105,140,0.75)', rgnBdrW: 1.0, rgnOp: 0.28,
-  navBg: '#F5F7FA',
-};
+export const THEME_LIST = ['fog', 'paper', 'slate', 'ink', 'forest', 'dusk'];
 
 export function getT(theme) {
-  return theme === 'dark' ? DARK : LIGHT;
+  return THEMES[theme] || THEMES.fog;
 }
 
 export function mapStyle(theme) {
-  const bg = theme === 'dark' ? DARK.bg : LIGHT.bg;
   return {
     version: 8,
     sources: {},
-    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } }],
+    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': getT(theme).bg } }],
   };
 }
 
 export function swapBasemap(map, basemap, theme) {
   if (!map || !map.getLayer('land')) return;
   if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
-  if (map.getSource('basemap-tiles'))  map.removeSource('basemap-tiles');
+  if (map.getSource('basemap-tiles')) map.removeSource('basemap-tiles');
+  const t = getT(theme);
 
   if (basemap === 'labeled') {
-    const variant = theme === 'dark' ? 'dark_all' : 'light_all';
     map.addSource('basemap-tiles', {
       type: 'raster',
-      tiles: ['a','b','c','d'].map(s => `https://${s}.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}@2x.png`),
+      tiles: ['a','b','c','d'].map(s => `https://${s}.basemaps.cartocdn.com/${t.cartoBg}/{z}/{x}/{y}@2x.png`),
       tileSize: 256,
       attribution: '© OpenStreetMap contributors © CARTO',
     });
@@ -103,10 +151,10 @@ export function toggleSatLabels(map, show, theme) {
   if (map.getLayer('sat-labels')) map.removeLayer('sat-labels');
   if (map.getSource('sat-labels-tiles')) map.removeSource('sat-labels-tiles');
   if (!show) return;
-  const variant = theme === 'dark' ? 'dark_only_labels' : 'light_only_labels';
+  const t = getT(theme);
   map.addSource('sat-labels-tiles', {
     type: 'raster',
-    tiles: ['a','b','c','d'].map(s => `https://${s}.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}@2x.png`),
+    tiles: ['a','b','c','d'].map(s => `https://${s}.basemaps.cartocdn.com/${t.cartoLabels}/{z}/{x}/{y}@2x.png`),
     tileSize: 256,
     attribution: '© OpenStreetMap contributors © CARTO',
   });
@@ -115,7 +163,6 @@ export function toggleSatLabels(map, show, theme) {
 
 export const PLANT_STATUSES = ['operating', 'construction', 'planned'];
 
-/** MapLibre match expression: feature fuel property → hex color */
 export function fuelColorExpr() {
   return ['match', ['get', 'fuel'],
     ...Object.entries(FUEL_COLORS).flatMap(([f, c]) => [f, c]),
@@ -123,7 +170,6 @@ export function fuelColorExpr() {
   ];
 }
 
-/** MapLibre circle-radius expression based on MW, scaled by a multiplier */
 export function plantRadiusExpr(scale = 1) {
   return [
     'interpolate', ['linear'], ['get', 'mw'],
@@ -136,7 +182,6 @@ export function plantRadiusExpr(scale = 1) {
   ];
 }
 
-/** MapLibre circle-radius expression based on population, scaled by a multiplier */
 export function lcRadiusExpr(scale = 1) {
   return [
     'interpolate', ['linear'], ['get', 'pop'],

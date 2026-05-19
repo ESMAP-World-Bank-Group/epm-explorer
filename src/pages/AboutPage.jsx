@@ -280,7 +280,7 @@ export default function AboutPage() {
                 <tbody>
                   {rows.map((row, i) => (
                     <tr key={i} style={{
-                      backgroundColor: i % 2 === 0 ? 'transparent' : (theme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
+                      backgroundColor: i % 2 === 0 ? 'transparent' : (t.isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
                     }}>
                       <td style={{ ...td, color: t.lbl, fontWeight: 500 }}>{row.layer}</td>
                       <td style={td}>
@@ -367,7 +367,7 @@ export default function AboutPage() {
                     {rows.map((row, i) => (
                       <tr key={i} style={{
                         backgroundColor: i % 2 === 0 ? 'transparent'
-                          : (theme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
+                          : (t.isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
                       }}>
                         <td style={{ ...td, color: t.lbl, fontWeight: 500, whiteSpace: 'nowrap' }}>
                           <a href={row.url} target="_blank" rel="noopener noreferrer"
