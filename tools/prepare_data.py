@@ -108,4 +108,11 @@ for src_path in (SRC / "cache").glob("region_substations_*.json"):
     out.write_text(json.dumps(geojson), encoding="utf-8")
     print(f"✓ {out.name}  ({len(geojson['features'])} substations)")
 
+# 7. fleet age (copy as-is — already clean JSON)
+for src_path in (SRC / "cache").glob("region_age_*.json"):
+    region_id = src_path.stem.replace("region_age_", "")
+    dst = DST / "cache" / f"region_age_{region_id}.json"
+    shutil.copy(src_path, dst)
+    print(f"✓ region_age_{region_id}.json")
+
 print("\nAll done.")
