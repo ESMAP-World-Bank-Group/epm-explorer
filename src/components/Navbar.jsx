@@ -1,7 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../App';
 import { getT } from '../constants';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+
+const EPM_DASHBOARD_URL = 'https://epm-dashboard.onrender.com';
 
 function useBreadcrumb() {
   const location = useLocation();
@@ -39,7 +41,18 @@ export default function Navbar() {
   const { theme, toggle } = useTheme();
   const t = getT(theme);
   const crumb = useBreadcrumb();
-  const [soonVisible, setSoonVisible] = useState(false);
+  const location = useLocation();
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+
+  // Pass region/country context to the dashboard if available
+  const dashboardUrl = useMemo(() => {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const params = new URLSearchParams();
+    if (parts[0] === 'region' && parts[1]) params.set('region', parts[1]);
+    else if (parts[0] === 'country' && parts[1]) params.set('country', parts[1]);
+    const qs = params.toString();
+    return qs ? `${EPM_DASHBOARD_URL}?${qs}` : EPM_DASHBOARD_URL;
+  }, [location.pathname]);
 
   return (
     <div style={{
@@ -76,49 +89,55 @@ export default function Navbar() {
 
       {/* Right: EPM Suite + theme toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {/* EPM Suite (coming soon) */}
+        {/* EPM Suite */}
         <div style={{ position: 'relative' }}>
-          <button
-            onMouseEnter={() => setSoonVisible(true)}
-            onMouseLeave={() => setSoonVisible(false)}
+          <a
+            href={dashboardUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onMouseEnter={() => setTooltipVisible(true)}
+            onMouseLeave={() => setTooltipVisible(false)}
             style={{
               background: 'none',
-              border: `1px solid rgba(74,143,204,0.35)`,
+              border: `1px solid rgba(74,143,204,0.55)`,
               borderRadius: 5, padding: '3px 10px',
-              cursor: 'default', color: 'rgba(74,143,204,0.7)',
+              cursor: 'pointer', color: 'rgba(74,143,204,0.9)',
               fontSize: '0.68rem', letterSpacing: '1px',
               textTransform: 'uppercase', fontFamily: 'inherit',
               display: 'flex', alignItems: 'center', gap: 6,
-              transition: 'border-color 0.2s, color 0.2s',
+              textDecoration: 'none',
+              transition: 'border-color 0.2s, color 0.2s, background 0.2s',
             }}
+            onMouseOver={e => e.currentTarget.style.background = 'rgba(74,143,204,0.08)'}
+            onMouseOut={e => { e.currentTarget.style.background = 'none'; setTooltipVisible(false); }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
             EPM Suite
-            <span style={{
-              fontSize: '0.48rem', letterSpacing: '1px', fontWeight: 700,
-              color: 'rgba(74,143,204,0.65)',
-              backgroundColor: 'rgba(74,143,204,0.1)',
-              borderRadius: 3, padding: '1px 4px',
-            }}>
-              SOON
-            </span>
-          </button>
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                 style={{ opacity: 0.55 }}>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
 
-          {soonVisible && (
+          {tooltipVisible && (
             <div style={{
               position: 'absolute', top: 34, right: 0, zIndex: 300,
               backgroundColor: t.panel, border: `1px solid ${t.panelBorder}`,
-              borderRadius: 6, padding: '10px 13px', width: 220,
+              borderRadius: 6, padding: '10px 13px', width: 230,
               fontSize: '0.68rem', color: t.muted,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.18)', lineHeight: 1.5,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.18)', lineHeight: 1.6,
+              pointerEvents: 'none',
             }}>
               <span style={{ color: t.lbl, fontWeight: 600, display: 'block', marginBottom: 4 }}>
-                EPM Suite
+                EPM Suite · Results Dashboard
               </span>
-              EPM model outputs, scenario comparisons, capacity expansion results, and planning analytics — coming soon.
+              Capacity expansion results, scenario comparisons, dispatch analysis and planning analytics.
             </div>
           )}
         </div>
