@@ -1,6 +1,6 @@
 export const FUEL_COLORS = {
   solar:      '#FFD43B',
-  wind:       '#90AAC4',   // grey-blue, distinct from hydro
+  wind:       '#66D9E8',   // cyan sky, distinct from coal grey and hydro blue
   hydro:      '#4DABF7',
   gas:        '#8B4513',   // saddlebrown
   coal:       '#868E96',
