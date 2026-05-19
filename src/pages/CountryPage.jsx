@@ -243,7 +243,7 @@ export default function CountryPage() {
         });
       }
 
-      // Country highlight — light fill + border on current country
+      // Country highlight fill (below zones)
       const hl = tv.highlight;
       map.addLayer({
         id: 'country-fill',
@@ -251,13 +251,6 @@ export default function CountryPage() {
         source: 'countries',
         filter: hlFilter,
         paint: { 'fill-color': hl.fill, 'fill-opacity': 0.08 },
-      });
-      map.addLayer({
-        id: 'country-border',
-        type: 'line',
-        source: 'countries',
-        filter: hlFilter,
-        paint: { 'line-color': hl.border, 'line-width': hl.borderW + 0.4, 'line-opacity': 0.95 },
       });
 
       // Admin-1 province/state boundaries (shown in 'admin' zone mode)
@@ -367,6 +360,15 @@ export default function CountryPage() {
         id: 'zone-links', type: 'line', source: 'zone-lines',
         layout: { visibility: 'none' },
         paint: { 'line-color': '#444', 'line-width': 2.5, 'line-opacity': 0.6, 'line-dasharray': [5, 4] },
+      });
+
+      // Country border on top of zone layers so it always covers zone outer edges
+      map.addLayer({
+        id: 'country-border',
+        type: 'line',
+        source: 'countries',
+        filter: hlFilter,
+        paint: { 'line-color': hl.border, 'line-width': hl.borderW + 0.4, 'line-opacity': 0.95 },
       });
 
       // ── Load centers ─────────────────────────────────────────────────────────
