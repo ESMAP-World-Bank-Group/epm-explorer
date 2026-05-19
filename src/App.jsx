@@ -12,7 +12,7 @@ export const ThemeCtx = createContext({ theme: 'dark', toggle: () => {} });
 export const useTheme = () => useContext(ThemeCtx);
 
 export default function App() {
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('light');
   const t = getT(theme);
 
   return (
