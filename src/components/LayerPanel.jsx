@@ -254,6 +254,7 @@ export default function LayerPanel({
         <span className="layer-row" onClick={onToggleLines}
           style={{ opacity: linesOn ? 1 : 0.35, cursor: 'pointer' }}>
           <span style={sec}>Transmission</span>
+          <span style={{ fontSize: '0.44rem', color: t.lblMuted, marginLeft: 5, fontWeight: 400, letterSpacing: 0, textTransform: 'none' }}>(OSM)</span>
         </span>
         {onDownloadLines && (
           <div style={{ position: 'relative' }}>
