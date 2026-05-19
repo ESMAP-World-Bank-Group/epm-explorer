@@ -90,6 +90,7 @@ export default function CountryPage() {
   const [zoneMode,           setZoneMode]           = useState('admin');
   const [nZones,             setNZones]             = useState(null);
   const [zonesIndex,         setZonesIndex]         = useState(null);
+  const [zoneLabelsOn,       setZoneLabelsOn]       = useState(true);
   const mapReadyRef        = useRef(false);
   const countryFeatureRef  = useRef(null);
 
@@ -118,7 +119,7 @@ export default function CountryPage() {
     setLinesOn(true); setPlantsOn(true); setSubsOn(false); setMinMw(100); setCircleScale(1.0);
     setLcCircleScale(1.0);
     setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
-    setZoneMode('admin'); setNZones(null);
+    setZoneMode('admin'); setNZones(null); setZoneLabelsOn(true);
     mapReadyRef.current = false;
     countryFeatureRef.current = null;
   }, [iso]);
@@ -497,6 +498,16 @@ export default function CountryPage() {
     });
   }, []);
 
+  const toggleZoneLabels = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer('zone-labels')) return;
+    setZoneLabelsOn(prev => {
+      const next = !prev;
+      map.setLayoutProperty('zone-labels', 'visibility', next ? 'visible' : 'none');
+      return next;
+    });
+  }, []);
+
   const handleLcMinPop = useCallback(pop => {
     const map = mapRef.current;
     if (!map) return;
@@ -542,7 +553,7 @@ export default function CountryPage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReadyRef.current || !map.getSource('zone-fills')) return;
-    const ZONE_IDS  = ['zone-fills', 'zone-borders', 'zone-labels'];
+    const ZONE_IDS  = ['zone-fills', 'zone-borders'];
     const ADMIN_IDS = ['admin1-fills', 'admin1-borders'];
 
     const showAdmin = zoneMode === 'admin';
@@ -592,8 +603,10 @@ export default function CountryPage() {
       for (const id of ZONE_IDS) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       }
+      if (map.getLayer('zone-labels'))
+        map.setLayoutProperty('zone-labels', 'visibility', zoneLabelsOn ? 'visible' : 'none');
     });
-  }, [zoneMode, nZones, iso]);
+  }, [zoneMode, nZones, iso, zoneLabelsOn]);
 
   // ── Plant source hot-swap ─────────────────────────────────────────────────
   useEffect(() => {
@@ -748,19 +761,32 @@ export default function CountryPage() {
             </div>
 
             {zoneMode === 'modeling' && zonesIndex[iso]?.length ? (
-              <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {zonesIndex[iso].map(n => (
-                  <button key={n} onClick={() => setNZones(n)} style={{
-                    fontSize: '0.48rem', padding: '2px 6px',
-                    borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit',
-                    border: `1px solid ${nZones === n ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
-                    backgroundColor: nZones === n ? 'rgba(74,143,204,0.13)' : 'transparent',
-                    color: nZones === n ? t.lbl : t.lblMuted,
+              <>
+                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {zonesIndex[iso].map(n => (
+                    <button key={n} onClick={() => setNZones(n)} style={{
+                      fontSize: '0.48rem', padding: '2px 6px',
+                      borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${nZones === n ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
+                      backgroundColor: nZones === n ? 'rgba(74,143,204,0.13)' : 'transparent',
+                      color: nZones === n ? t.lbl : t.lblMuted,
+                    }}>
+                      {n}z
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginTop: 5, borderTop: `1px solid ${t.panelBorder}`, paddingTop: 4 }}>
+                  <button onClick={toggleZoneLabels} style={{
+                    fontSize: '0.48rem', padding: '2px 6px', borderRadius: 3, cursor: 'pointer',
+                    fontFamily: 'inherit', width: '100%',
+                    border: `1px solid ${zoneLabelsOn ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
+                    backgroundColor: zoneLabelsOn ? 'rgba(74,143,204,0.13)' : 'transparent',
+                    color: zoneLabelsOn ? t.lbl : t.lblMuted,
                   }}>
-                    {n}z
+                    Labels
                   </button>
-                ))}
-              </div>
+                </div>
+              </>
             ) : zoneMode === 'modeling' ? (
               <p style={{ fontSize: '0.48rem', color: t.lblMuted, fontStyle: 'italic', margin: 0 }}>
                 No zone data — run pipeline
