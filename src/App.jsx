@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import WorldPage from './pages/WorldPage';
 import RegionPage from './pages/RegionPage';
 import CountryPage from './pages/CountryPage';
+import AboutPage from './pages/AboutPage';
 import { getT } from './constants';
 
 export const ThemeCtx = createContext({ theme: 'dark', toggle: () => {} });
@@ -26,6 +27,7 @@ export default function App() {
               <Route path="/"                    element={<WorldPage />} />
               <Route path="/region/:regionId"    element={<RegionPage />} />
               <Route path="/country/:iso"        element={<CountryPage />} />
+              <Route path="/about"               element={<AboutPage />} />
             </Routes>
           </div>
         </div>

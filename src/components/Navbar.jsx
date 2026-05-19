@@ -87,7 +87,7 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Right: EPM Suite + theme toggle */}
+      {/* Right: EPM Suite + Data Sources + theme toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {/* EPM Suite */}
         <div style={{ position: 'relative' }}>
@@ -141,6 +141,21 @@ export default function Navbar() {
             </div>
           )}
         </div>
+
+        {/* Data Sources */}
+        <Link to="/about" style={{
+          background: 'none',
+          border: `1px solid ${t.panelBorder}`,
+          borderRadius: 5, padding: '3px 10px',
+          cursor: 'pointer', color: t.lblMuted,
+          fontSize: '0.68rem', letterSpacing: '1px',
+          textTransform: 'uppercase', fontFamily: 'inherit',
+          textDecoration: 'none',
+          display: 'inline-flex', alignItems: 'center',
+          transition: 'border-color 0.2s, color 0.2s',
+        }}>
+          Data Sources
+        </Link>
 
         {/* Theme toggle */}
         <button onClick={toggle} style={{
