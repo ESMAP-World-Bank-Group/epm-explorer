@@ -58,7 +58,7 @@ function TrendChart({ historical, projected, t }) {
   const vals    = all.map(([, v]) => v);
   const minYear = Math.min(...years), maxYear = Math.max(...years);
   const maxVal  = Math.max(...vals) * 1.12;
-  const W = 226, H = 72, pL = 30, pR = 6, pT = 6, pB = 18;
+  const W = 226, H = 72, pL = 34, pR = 6, pT = 6, pB = 18;
   const iW = W - pL - pR, iH = H - pT - pB;
   const toX = y => pL + ((y - minYear) / (maxYear - minYear || 1)) * iW;
   const toY = v => pT + iH - (v / maxVal) * iH;
@@ -86,6 +86,9 @@ function TrendChart({ historical, projected, t }) {
           </g>
         );
       })}
+      {/* Y axis unit */}
+      <text transform={`translate(8, ${pT + iH / 2}) rotate(-90)`}
+        textAnchor="middle" fill={t.lblMuted} fontSize={6}>kWh/cap</text>
       {/* Historical */}
       <polyline points={histPts} fill="none" stroke="#4DABF7"
         strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
@@ -164,6 +167,7 @@ export default function LoadTab({ iso, theme }) {
 
   const historical = wdi || [];
   let projected = [];
+  let cagr = null;
   if (historical.length >= 3) {
     const fit = linearFit(historical);
     if (fit) {
@@ -173,6 +177,10 @@ export default function LoadTab({ iso, theme }) {
         return [yr, Math.max(0, Math.round(fit.m * yr + fit.b))];
       });
     }
+    // CAGR from first to last valid year
+    const v0 = historical[0][1], v1 = historical[historical.length - 1][1];
+    const n  = historical[historical.length - 1][0] - historical[0][0];
+    if (v0 > 0 && n > 0) cagr = ((Math.pow(v1 / v0, 1 / n) - 1) * 100).toFixed(1);
   }
 
   const { data: profileData, label: profileLabel } = getProfile(iso);
@@ -214,12 +222,26 @@ export default function LoadTab({ iso, theme }) {
             </span>
           </div>
           <TrendChart historical={historical} projected={projected} t={t} />
-          <div style={{ display: 'flex', gap: 14, marginTop: 5 }}>
-            {legend('#4DABF7', null,  'Historical (WB WDI)')}
-            {legend('#4DABF7', '4,3', 'Linear extrapolation')}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {legend('#4DABF7', null,  'Historical (WB WDI)')}
+              {legend('#4DABF7', '4,3', 'Linear extrap.')}
+            </div>
+            {cagr != null && (
+              <div style={{
+                fontSize: '0.55rem', color: parseFloat(cagr) >= 0 ? '#40C057' : '#F03E3E',
+                fontWeight: 700, letterSpacing: '0.3px',
+              }}>
+                {parseFloat(cagr) >= 0 ? '+' : ''}{cagr}%
+                <span style={{ fontSize: '0.44rem', color: t.lblMuted, fontWeight: 400, marginLeft: 2 }}>
+                  CAGR
+                </span>
+              </div>
+            )}
           </div>
-          <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 4, fontStyle: 'italic', marginBottom: 14 }}>
-            Source: World Bank WDI · EG.USE.ELEC.KH.PC
+          <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 3, fontStyle: 'italic', marginBottom: 14 }}>
+            Source: World Bank WDI · EG.USE.ELEC.KH.PC ·{' '}
+            {historical[0][0]}–{historical[historical.length - 1][0]}
           </p>
         </>
       )}

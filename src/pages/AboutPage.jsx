@@ -2,6 +2,53 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../App';
 import { getT } from '../constants';
 
+const OPEN_DATA = [
+  {
+    category: 'Electricity Demand',
+    rows: [
+      { name: 'Our World in Data',   res: 'Yearly',         desc: 'Historical electricity consumption by country',          url: 'https://ourworldindata.org/energy' },
+      { name: 'ENTSO-E Transparency',res: 'Monthly / hourly',desc: 'Load data for European countries',                       url: 'https://transparency.entsoe.eu' },
+      { name: 'SYNDE (GEGIS)',        res: 'Hourly',         desc: 'Modelled demand under SSP scenarios',                    url: 'https://github.com/Open-Poen/SYNDE' },
+    ],
+  },
+  {
+    category: 'Existing Generation Capacity',
+    rows: [
+      { name: 'Global Energy Monitor',       res: 'Global',  desc: 'Unit-level power plant data, operating + planned',      url: 'https://globalenergymonitor.org' },
+      { name: 'PowerPlantMatching',          res: 'Europe',  desc: 'Matched plant database, CSV download',                  url: 'https://github.com/FRESNA/powerplantmatching' },
+      { name: 'Global Power Plant Database', res: 'Global',  desc: 'Plant capacity, fuel, ownership (frozen 2021)',         url: 'https://github.com/wri/global-power-plant-database' },
+    ],
+  },
+  {
+    category: 'Solar & Wind Profiles',
+    rows: [
+      { name: 'Renewables.ninja',   res: 'Hourly',  desc: 'Simulated PV and wind capacity factors at any location',         url: 'https://www.renewables.ninja' },
+      { name: 'Global Solar Atlas', res: '—',       desc: 'Solar resource maps and data (ESMAP / World Bank)',               url: 'https://globalsolaratlas.info' },
+      { name: 'Global Wind Atlas',  res: '—',       desc: 'Wind resource maps and data',                                    url: 'https://globalwindatlas.info' },
+      { name: 'atlite',             res: 'Hourly',  desc: 'Python library for weather-derived power profiles (ERA5)',       url: 'https://atlite.readthedocs.io' },
+      { name: 'Sterl et al. 2022',  res: '—',       desc: 'PV and wind supply regions across Africa',                      url: 'https://doi.org/10.1038/s41560-021-00922-4' },
+    ],
+  },
+  {
+    category: 'Hydropower',
+    rows: [
+      { name: 'EIA',                    res: 'Yearly',   desc: 'Historical hydro generation by country',                   url: 'https://www.eia.gov/international/data/world' },
+      { name: 'GRDC',                   res: 'Monthly',  desc: 'Global river discharge and runoff data',                   url: 'https://grdc.bafg.de' },
+      { name: 'FAO AQUASTAT',           res: '—',        desc: 'Geo-referenced database of dams and reservoirs',           url: 'https://www.fao.org/aquastat' },
+      { name: 'Global Dam Watch',       res: '—',        desc: 'GRanD/FHReD: existing + future reservoir database',        url: 'https://globaldamwatch.org' },
+    ],
+  },
+  {
+    category: 'Comprehensive / Multi-category',
+    rows: [
+      { name: 'Ember',           res: '85+ geographies', desc: 'Global power data: generation, emissions, demand',         url: 'https://ember-energy.org/data' },
+      { name: 'PyPSA-Earth',     res: 'Global',          desc: 'Open global electricity model with full data workflow',    url: 'https://pypsa-earth.readthedocs.io' },
+      { name: 'ENERGYDATA.INFO', res: 'Global',          desc: 'World Bank open data platform for the energy sector',     url: 'https://energydata.info' },
+      { name: 'OSeMOSYS Global', res: 'Global',          desc: 'Global energy system data (Brinkerink et al. 2021)',       url: 'https://doi.org/10.1038/s41597-021-01033-9' },
+    ],
+  },
+];
+
 const SOURCES = [
   {
     category: 'Power Plants',
@@ -239,6 +286,98 @@ export default function AboutPage() {
                 <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color, display: 'inline-block' }} />
                 <span style={{ fontSize: '0.62rem', color: t.muted }}>{label}</span>
               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Additional Open Data Sources ── */}
+        <div style={{ marginTop: 48 }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: t.text, marginBottom: 6 }}>
+            Additional Open Data Sources
+          </h2>
+          <p style={{ fontSize: '0.72rem', color: t.muted, maxWidth: 600, lineHeight: 1.65, marginBottom: 6 }}>
+            A curated list of open data sources useful for populating EPM inputs. Not currently integrated
+            in the explorer — listed here for reference.
+          </p>
+          <div style={{
+            padding: '8px 12px', borderRadius: 5, marginBottom: 24,
+            backgroundColor: 'rgba(252,196,25,0.08)',
+            border: '1px solid rgba(252,196,25,0.25)',
+            fontSize: '0.6rem', color: t.muted, lineHeight: 1.55,
+          }}>
+            Work in progress — suggestions welcome via{' '}
+            <a href="https://github.com/ESMAP-World-Bank-Group/epm-explorer/issues"
+              target="_blank" rel="noopener noreferrer"
+              style={{ color: 'rgba(74,143,204,0.8)', textDecoration: 'none' }}>
+              GitHub Issues
+            </a>.
+          </div>
+
+          {OPEN_DATA.map(({ category, rows }) => (
+            <div key={category}>
+              <span style={sec}>{category}</span>
+              <div style={{
+                borderRadius: 6, overflow: 'hidden',
+                border: `1px solid ${t.panelBorder}`, marginBottom: 8,
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: t.panel }}>
+                      <th style={th}>Source</th>
+                      <th style={th}>Resolution / Coverage</th>
+                      <th style={{ ...th, whiteSpace: 'normal', minWidth: 220 }}>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => (
+                      <tr key={i} style={{
+                        backgroundColor: i % 2 === 0 ? 'transparent'
+                          : (theme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)'),
+                      }}>
+                        <td style={{ ...td, color: t.lbl, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                          <a href={row.url} target="_blank" rel="noopener noreferrer"
+                            style={{ color: 'rgba(74,143,204,0.85)', textDecoration: 'none' }}>
+                            {row.name}
+                          </a>
+                        </td>
+                        <td style={{ ...td, whiteSpace: 'nowrap' }}>{row.res}</td>
+                        <td style={{ ...td, color: t.lblMuted, lineHeight: 1.5 }}>{row.desc}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── EPM Model ── */}
+        <div style={{
+          marginTop: 32, padding: '14px 16px', borderRadius: 6,
+          border: `1px solid ${t.panelBorder}`, backgroundColor: t.panel,
+        }}>
+          <span style={{ ...sec, marginTop: 0, marginBottom: 8 }}>EPM Model</span>
+          <p style={{ fontSize: '0.65rem', color: t.muted, lineHeight: 1.65, marginBottom: 10 }}>
+            The Regional Power Explorer is part of the EPM (Electricity Planning Model) suite — a capacity
+            expansion and dispatch optimization model used for World Bank power sector planning studies.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {[
+              { label: 'EPM Documentation', url: 'https://esmap-world-bank-group.github.io/EPM_main/' },
+              { label: 'GitHub Repository',  url: 'https://github.com/ESMAP-World-Bank-Group/epm-explorer' },
+            ].map(({ label, url }) => (
+              <a key={label} href={url} target="_blank" rel="noopener noreferrer" style={{
+                fontSize: '0.62rem', color: 'rgba(74,143,204,0.85)',
+                border: '1px solid rgba(74,143,204,0.3)', borderRadius: 4,
+                padding: '4px 10px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5,
+              }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                {label}
+              </a>
             ))}
           </div>
         </div>

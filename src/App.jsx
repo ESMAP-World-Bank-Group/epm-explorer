@@ -31,6 +31,25 @@ export default function App() {
             </Routes>
           </div>
         </div>
+
+        {/* Bottom-left attribution */}
+        <div style={{
+          position: 'fixed', bottom: 10, left: 12, zIndex: 100,
+          lineHeight: 1.6, pointerEvents: 'none',
+        }}>
+          <div style={{
+            fontSize: '0.44rem', fontWeight: 700, letterSpacing: '0.8px',
+            color: t.lblMuted, textTransform: 'uppercase',
+          }}>
+            World Bank · ESMAP
+          </div>
+          <a href="mailto:mbaronnet@worldbank.org" style={{
+            fontSize: '0.42rem', color: t.lblMuted, textDecoration: 'none',
+            opacity: 0.65, pointerEvents: 'all',
+          }}>
+            mbaronnet@worldbank.org
+          </a>
+        </div>
       </BrowserRouter>
     </ThemeCtx.Provider>
   );
