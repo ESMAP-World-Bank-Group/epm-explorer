@@ -8,6 +8,7 @@ import CountryOverview from '../components/CountryOverview';
 import REResourcesTab from '../components/tabs/REResourcesTab';
 import LoadTab from '../components/tabs/LoadTab';
 import ZoningTab from '../components/tabs/ZoningTab';
+import { fetchResourceGrid, SOLAR_COLOR_EXPR, WIND_COLOR_EXPR } from '../utils/nasaPower';
 
 function downloadBlob(content, filename, type = 'application/octet-stream') {
   const blob = new Blob([content], { type });
@@ -15,23 +16,6 @@ function downloadBlob(content, filename, type = 'application/octet-stream') {
   const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function lerpRGB([r1,g1,b1], [r2,g2,b2], t) {
-  return `rgb(${Math.round(r1+t*(r2-r1))},${Math.round(g1+t*(g2-g1))},${Math.round(b1+t*(b2-b1))})`;
-}
-function clamp01(t) { return Math.max(0, Math.min(1, t)); }
-function solarColor(ghi) {
-  const stops = [[255,249,196],[255,224,130],[255,167,38],[255,87,34],[183,28,28]];
-  const t = clamp01((ghi - 700) / 1900) * (stops.length - 1);
-  const i = Math.min(Math.floor(t), stops.length - 2);
-  return lerpRGB(stops[i], stops[i+1], t - i);
-}
-function windColor(v100) {
-  const stops = [[235,245,251],[133,193,233],[46,134,193],[26,82,118]];
-  const t = clamp01((v100 - 3) / 7) * (stops.length - 1);
-  const i = Math.min(Math.floor(t), stops.length - 2);
-  return lerpRGB(stops[i], stops[i+1], t - i);
 }
 
 // Ray-casting point-in-polygon (handles Polygon + MultiPolygon)
@@ -101,7 +85,9 @@ export default function CountryPage() {
   const [activeTab,          setActiveTab]          = useState('overview');
   const [resourceOverlay,    setResourceOverlay]    = useState(null);
   const [mapReady,           setMapReady]           = useState(false);
-  const countryFeatureRef = useRef(null);
+  const countryFeatureRef  = useRef(null);
+  const countryBoundsRef   = useRef(null); // { south, north, west, east }
+  const resourceCacheRef   = useRef({});
 
   // Static data — fetch once
   useEffect(() => {
@@ -127,7 +113,7 @@ export default function CountryPage() {
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
     setResourceOverlay(null); setMapReady(false);
-    countryFeatureRef.current = null;
+    countryFeatureRef.current = null; countryBoundsRef.current = null; resourceCacheRef.current = {};
   }, [iso]);
 
   useEffect(() => {
@@ -168,10 +154,13 @@ export default function CountryPage() {
       const bounds = fitBoundsCountry(iso, countries);
       if (bounds) {
         map.fitBounds(bounds, { padding: 60, duration: 0, maxZoom: 9 });
-        setCountryCenter({
-          lon: (bounds[0][0] + bounds[1][0]) / 2,
-          lat: (bounds[0][1] + bounds[1][1]) / 2,
-        });
+        const cx = (bounds[0][0] + bounds[1][0]) / 2;
+        const cy = (bounds[0][1] + bounds[1][1]) / 2;
+        setCountryCenter({ lon: cx, lat: cy });
+        countryBoundsRef.current = {
+          south: bounds[0][1], north: bounds[1][1],
+          west:  bounds[0][0], east:  bounds[1][0],
+        };
       }
 
       // Filter plants strictly inside the country polygon (point-in-polygon)
@@ -253,6 +242,16 @@ export default function CountryPage() {
         filter: ['==', ['get', 'ISO_A3'], iso],
         paint: { 'line-color': hl.border, 'line-width': hl.borderW + 0.4, 'line-opacity': 0.95 },
       });
+
+      // Resource grid (NASA POWER) — data loaded on demand
+      map.addSource('resource-grid', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'resource-grid',
+        type: 'fill',
+        source: 'resource-grid',
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': SOLAR_COLOR_EXPR, 'fill-opacity': 0.82 },
+      }, 'country-border');
 
       // Plants
       const fuels = new Set();
@@ -449,53 +448,37 @@ export default function CountryPage() {
       .catch(() => setFleetAge(null));
   }, [plantSource, info]);
 
-  // ── Resource overlay ─────────────────────────────────────────────────────
+  // ── Resource overlay (NASA POWER granular grid) ───────────────────────────
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !countryCenter) return;
+    if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    if (!map.getLayer('country-fill')) return;
-
-    const HELLMAN = 0.143;
-    const hl = HIGHLIGHT[theme] || HIGHLIGHT.dark;
+    if (!map.getLayer('resource-grid') || !map.getSource('resource-grid')) return;
 
     if (resourceOverlay === null) {
-      map.setPaintProperty('country-fill', 'fill-color', hl.fill);
-      map.setPaintProperty('country-fill', 'fill-opacity', 1.0);
+      map.setLayoutProperty('resource-grid', 'visibility', 'none');
       return;
     }
 
-    const { lat, lon } = countryCenter;
+    map.setPaintProperty('resource-grid', 'fill-color',
+      resourceOverlay === 'solar' ? SOLAR_COLOR_EXPR : WIND_COLOR_EXPR);
+    map.setLayoutProperty('resource-grid', 'visibility', 'visible');
 
-    if (resourceOverlay === 'solar') {
-      fetch(`https://api.globalsolaratlas.info/data/lta?loc=${lat.toFixed(4)},${lon.toFixed(4)}`)
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-        .then(d => {
-          const ghi = d.annual?.data?.GHI;
-          if (ghi == null || !mapRef.current?.getLayer('country-fill')) return;
-          mapRef.current.setPaintProperty('country-fill', 'fill-color', solarColor(ghi));
-          mapRef.current.setPaintProperty('country-fill', 'fill-opacity', 0.82);
-        })
-        .catch(() => {});
-    } else if (resourceOverlay === 'wind') {
-      fetch(
-        `https://archive-api.open-meteo.com/v1/archive?` +
-        `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
-        `&start_date=2019-01-01&end_date=2023-12-31&monthly=wind_speed_10m`
-      )
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-        .then(d => {
-          const speeds = d.monthly?.wind_speed_10m || [];
-          const valid = speeds.filter(v => v != null);
-          if (!valid.length || !mapRef.current?.getLayer('country-fill')) return;
-          const mean10m = valid.reduce((s, v) => s + v, 0) / valid.length;
-          const mean100m = mean10m * Math.pow(100 / 10, HELLMAN);
-          mapRef.current.setPaintProperty('country-fill', 'fill-color', windColor(mean100m));
-          mapRef.current.setPaintProperty('country-fill', 'fill-opacity', 0.82);
-        })
-        .catch(() => {});
+    if (resourceCacheRef.current[resourceOverlay]) {
+      map.getSource('resource-grid').setData(resourceCacheRef.current[resourceOverlay]);
+      return;
     }
-  }, [resourceOverlay, mapReady, countryCenter, theme]);
+
+    const b = countryBoundsRef.current;
+    if (!b) return;
+
+    fetchResourceGrid(b.south, b.north, b.west, b.east, resourceOverlay)
+      .then(grid => {
+        resourceCacheRef.current[resourceOverlay] = grid;
+        if (mapRef.current?.getSource('resource-grid'))
+          mapRef.current.getSource('resource-grid').setData(grid);
+      });
+  }, [resourceOverlay, mapReady]);
 
   // ── Download handlers ────────────────────────────────────────────────────
 

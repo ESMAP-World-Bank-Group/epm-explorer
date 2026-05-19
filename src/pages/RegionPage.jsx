@@ -9,22 +9,7 @@ import {
 import LayerPanel from '../components/LayerPanel';
 import CapacityChart from '../components/CapacityChart';
 import StatsPanel from '../components/StatsPanel';
-
-// ── Resource overlay color expressions ───────────────────────────────────────
-const SOLAR_OVERLAY_EXPR = ['case',
-  ['>', ['coalesce', ['feature-state', 'resourceValue'], -1], 0],
-  ['interpolate', ['linear'], ['feature-state', 'resourceValue'],
-    700, '#FFF9C4', 1200, '#FFE082', 1600, '#FFA726', 2000, '#FF5722', 2600, '#B71C1C',
-  ],
-  'rgba(0,0,0,0)',
-];
-const WIND_OVERLAY_EXPR = ['case',
-  ['>', ['coalesce', ['feature-state', 'resourceValue'], -1], 0],
-  ['interpolate', ['linear'], ['feature-state', 'resourceValue'],
-    3, '#EBF5FB', 5, '#85C1E9', 7, '#2E86C1', 9, '#1A5276',
-  ],
-  'rgba(0,0,0,0)',
-];
+import { fetchResourceGrid, SOLAR_COLOR_EXPR, WIND_COLOR_EXPR } from '../utils/nasaPower';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -96,8 +81,8 @@ export default function RegionPage() {
   const [activeTab,     setActiveTab]     = useState('overview');
   const [resourceOverlay, setResourceOverlay] = useState(null); // null | 'solar' | 'wind'
   const [mapReady,        setMapReady]        = useState(false);
-  const isoToCenterRef    = useRef({});
-  const isoToFeatureIdRef = useRef({});
+  const regionBoundsRef   = useRef(null);  // { south, north, west, east }
+  const resourceCacheRef  = useRef({});    // { solar: GeoJSON, wind: GeoJSON }
 
   // Static data
   useEffect(() => {
@@ -126,6 +111,7 @@ export default function RegionPage() {
     fetch(`/data/cache/region_plants_${regionId}_gem.geojson`, { method: 'HEAD' })
       .then(r => setGemAvailable(r.ok)).catch(() => setGemAvailable(false));
     setResourceOverlay(null); setMapReady(false);
+    regionBoundsRef.current = null; resourceCacheRef.current = {};
   }, [regionId]);
 
   // Fleet age — GPPD only
@@ -175,7 +161,13 @@ export default function RegionPage() {
       });
 
       const bounds = fitBounds(expandedIsos, countries);
-      if (bounds) map.fitBounds(bounds, { padding: 40, duration: 0 });
+      if (bounds) {
+        map.fitBounds(bounds, { padding: 40, duration: 0 });
+        regionBoundsRef.current = {
+          south: bounds[0][1] - 1, north: bounds[1][1] + 1,
+          west:  bounds[0][0] - 1, east:  bounds[1][0] + 1,
+        };
+      }
 
       map.addSource('countries',   { type: 'geojson', data: countries, generateId: false });
       map.addSource('plants',      { type: 'geojson', data: plantsGJ });
@@ -188,34 +180,6 @@ export default function RegionPage() {
       map.addLayer({ id: 'borders', type: 'line', source: 'countries',
         paint: { 'line-color': tv.worldBdr, 'line-width': tv.worldBdrW } });
 
-      // Build isoToCenter and isoToFeatureId lookups
-      const isoToCenter = {};
-      const isoToFeatureId = {};
-      for (const f of countries.features) {
-        const fIso = f.properties.ISO_A3;
-        if (!expandedIsos.includes(fIso)) continue;
-        isoToFeatureId[fIso] = f.id;
-        if (!isoToCenter[fIso]) {
-          const geom = f.geometry;
-          const rings = geom.type === 'Polygon'
-            ? geom.coordinates
-            : geom.coordinates.flatMap(p => p);
-          let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
-          for (const ring of rings)
-            for (const [lon, lat] of ring) {
-              if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
-              if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
-            }
-          if (isFinite(minLon)) {
-            isoToCenter[fIso] = {
-              lon: (minLon + maxLon) / 2,
-              lat: (minLat + maxLat) / 2,
-            };
-          }
-        }
-      }
-      isoToCenterRef.current    = isoToCenter;
-      isoToFeatureIdRef.current = isoToFeatureId;
 
       // Transmission lines
       const kvFilters = {
@@ -241,18 +205,18 @@ export default function RegionPage() {
         filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'line-color': hl.border, 'line-width': hl.borderW, 'line-opacity': 0.9 } });
 
-      // Resource overlay layer (hidden by default, inserted before lines)
+      // Resource grid (NASA POWER) — added as empty source; data loaded on demand
+      map.addSource('resource-grid', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({
-        id: 'resource-overlay',
+        id: 'resource-grid',
         type: 'fill',
-        source: 'countries',
-        filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
+        source: 'resource-grid',
         layout: { visibility: 'none' },
         paint: {
-          'fill-color': 'rgba(0,0,0,0)',
-          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.85, 0.72],
+          'fill-color': SOLAR_COLOR_EXPR,
+          'fill-opacity': 0.82,
         },
-      }, 'lines-110');
+      }, 'region-border');
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
       const fuels = new Set();
@@ -485,76 +449,40 @@ export default function RegionPage() {
       });
   }, [plantSource, regionId]);
 
-  // ── Resource overlay ─────────────────────────────────────────────────────
+  // ── Resource overlay (NASA POWER granular grid) ───────────────────────────
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !region) return;
+    if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    if (!map.getLayer('resource-overlay')) return;
-
-    const HELLMAN = 0.143;
+    if (!map.getLayer('resource-grid') || !map.getSource('resource-grid')) return;
 
     if (resourceOverlay === null) {
-      map.setLayoutProperty('resource-overlay', 'visibility', 'none');
-      for (const iso of region.countries.map(c => c.iso)) {
-        const fid = isoToFeatureIdRef.current[iso];
-        if (fid != null) map.setFeatureState({ source: 'countries', id: fid }, { resourceValue: -1 });
-      }
+      map.setLayoutProperty('resource-grid', 'visibility', 'none');
       return;
     }
 
-    map.setLayoutProperty('resource-overlay', 'visibility', 'visible');
-    map.setPaintProperty('resource-overlay', 'fill-color',
-      resourceOverlay === 'solar' ? SOLAR_OVERLAY_EXPR : WIND_OVERLAY_EXPR);
+    // Switch color expression for this type
+    map.setPaintProperty('resource-grid', 'fill-color',
+      resourceOverlay === 'solar' ? SOLAR_COLOR_EXPR : WIND_COLOR_EXPR);
+    map.setLayoutProperty('resource-grid', 'visibility', 'visible');
 
-    // Initialise all to -1
-    for (const iso of region.countries.map(c => c.iso)) {
-      const fid = isoToFeatureIdRef.current[iso];
-      if (fid != null) map.setFeatureState({ source: 'countries', id: fid }, { resourceValue: -1 });
+    // Serve from cache if available
+    if (resourceCacheRef.current[resourceOverlay]) {
+      map.getSource('resource-grid').setData(resourceCacheRef.current[resourceOverlay]);
+      return;
     }
 
-    const isoList = region.countries.map(c => c.iso);
-    const fetches = isoList.map(iso => {
-      const center = isoToCenterRef.current[iso];
-      if (!center) return Promise.resolve({ iso, value: null });
-      const { lat, lon } = center;
+    // Fetch NASA POWER grid for the region extent
+    const b = regionBoundsRef.current;
+    if (!b) return;
 
-      if (resourceOverlay === 'solar') {
-        return fetch(`https://api.globalsolaratlas.info/data/lta?loc=${lat.toFixed(4)},${lon.toFixed(4)}`)
-          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-          .then(d => ({ iso, value: d.annual?.data?.GHI ?? null }))
-          .catch(() => ({ iso, value: null }));
-      } else {
-        return fetch(
-          `https://archive-api.open-meteo.com/v1/archive?` +
-          `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
-          `&start_date=2019-01-01&end_date=2023-12-31&monthly=wind_speed_10m`
-        )
-          .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-          .then(d => {
-            const speeds = d.monthly?.wind_speed_10m || [];
-            const valid = speeds.filter(v => v != null);
-            if (!valid.length) return { iso, value: null };
-            const mean10m = valid.reduce((s, v) => s + v, 0) / valid.length;
-            const mean100m = mean10m * Math.pow(100 / 10, HELLMAN);
-            return { iso, value: mean100m };
-          })
-          .catch(() => ({ iso, value: null }));
-      }
-    });
-
-    Promise.allSettled(fetches).then(results => {
-      for (const r of results) {
-        if (r.status !== 'fulfilled') continue;
-        const { iso, value } = r.value;
-        if (value == null) continue;
-        const fid = isoToFeatureIdRef.current[iso];
-        if (fid != null && mapRef.current?.getLayer('resource-overlay')) {
-          mapRef.current.setFeatureState({ source: 'countries', id: fid }, { resourceValue: value });
-        }
-      }
-    });
-  }, [resourceOverlay, mapReady, region]);
+    fetchResourceGrid(b.south, b.north, b.west, b.east, resourceOverlay)
+      .then(grid => {
+        resourceCacheRef.current[resourceOverlay] = grid;
+        if (mapRef.current?.getSource('resource-grid'))
+          mapRef.current.getSource('resource-grid').setData(grid);
+      });
+  }, [resourceOverlay, mapReady]);
 
   // ── Download helpers ──────────────────────────────────────────────────────
 
