@@ -210,10 +210,8 @@ export default function RegionPage() {
 
 
       // Preferred zones overlay (hidden until mapMode === 'zones')
-      // Two sources: default tolerance (simplified) and tolerance:0 (full detail / refine mode)
       const emptyGJ = { type: 'FeatureCollection', features: [] };
-      map.addSource('region-zones',    { type: 'geojson', data: emptyGJ });
-      map.addSource('region-zones-hd', { type: 'geojson', data: emptyGJ, tolerance: 0 });
+      map.addSource('region-zones', { type: 'geojson', data: emptyGJ });
 
       const zoneLayerPaint = {
         fill:   { 'fill-color': zoneColorExpr(), 'fill-opacity': 0.35 },
@@ -222,10 +220,6 @@ export default function RegionPage() {
       map.addLayer({ id: 'region-zones-fill',   type: 'fill', source: 'region-zones',
         layout: { visibility: 'none' }, paint: zoneLayerPaint.fill });
       map.addLayer({ id: 'region-zones-border', type: 'line', source: 'region-zones',
-        layout: { visibility: 'none' }, paint: zoneLayerPaint.border });
-      map.addLayer({ id: 'region-zones-fill-hd',   type: 'fill', source: 'region-zones-hd',
-        layout: { visibility: 'none' }, paint: zoneLayerPaint.fill });
-      map.addLayer({ id: 'region-zones-border-hd', type: 'line', source: 'region-zones-hd',
         layout: { visibility: 'none' }, paint: zoneLayerPaint.border });
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
@@ -375,12 +369,9 @@ export default function RegionPage() {
         const canonIso = (!isos.includes(iso) && ALIAS_TO_CANON[iso]) || iso;
         if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
       };
-      map.on('click', 'region-zones-fill',    onZoneClick);
-      map.on('click', 'region-zones-fill-hd', onZoneClick);
-      map.on('mouseenter', 'region-zones-fill',    () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'region-zones-fill',    () => { map.getCanvas().style.cursor = ''; });
-      map.on('mouseenter', 'region-zones-fill-hd', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'region-zones-fill-hd', () => { map.getCanvas().style.cursor = ''; });
+      map.on('click', 'region-zones-fill', onZoneClick);
+      map.on('mouseenter', 'region-zones-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'region-zones-fill', () => { map.getCanvas().style.cursor = ''; });
 
     });
 
@@ -401,49 +392,34 @@ export default function RegionPage() {
     toggleSatLabels(map, satLabels, theme);
   }, [satLabels, basemap, theme]);
 
-  // ── Zone mode toggle ─────────────────────────────────────────────────────
+  // ── Zone mode / refine toggle ─────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.getLayer('region-zones-fill')) return;
     const showZones = mapMode === 'zones';
     if (showZones) {
-      fetch(`/data/zones/${regionId}_preferred_zones.geojson`)
+      const url = refineMode
+        ? `/data/zones/${regionId}_preferred_zones_hd.geojson`
+        : `/data/zones/${regionId}_preferred_zones.geojson`;
+      fetch(url)
         .then(r => r.json())
         .then(data => {
           const m = mapRef.current;
           if (!m?.getSource('region-zones')) return;
           m.getSource('region-zones').setData(data);
-          m.getSource('region-zones-hd').setData(data);
-          const showNormal = ['region-zones-fill', 'region-zones-border'];
-          const showHD     = ['region-zones-fill-hd', 'region-zones-border-hd'];
-          const [show, hide] = refineMode ? [showHD, showNormal] : [showNormal, showHD];
-          for (const id of show) m.setLayoutProperty(id, 'visibility', 'visible');
-          for (const id of hide) m.setLayoutProperty(id, 'visibility', 'none');
+          m.setLayoutProperty('region-zones-fill',   'visibility', 'visible');
+          m.setLayoutProperty('region-zones-border', 'visibility', 'visible');
           m.setLayoutProperty('region-fill', 'visibility', 'none');
         })
         .catch(() => setMapMode('countries'));
     } else {
-      const allZoneLayers = ['region-zones-fill', 'region-zones-border',
-                             'region-zones-fill-hd', 'region-zones-border-hd'];
-      for (const id of allZoneLayers)
-        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
-      if (map.getLayer('region-fill')) map.setLayoutProperty('region-fill', 'visibility', 'visible');
-      const empty = { type: 'FeatureCollection', features: [] };
-      if (map.getSource('region-zones'))    map.getSource('region-zones').setData(empty);
-      if (map.getSource('region-zones-hd')) map.getSource('region-zones-hd').setData(empty);
+      if (map.getLayer('region-zones-fill'))   map.setLayoutProperty('region-zones-fill',   'visibility', 'none');
+      if (map.getLayer('region-zones-border')) map.setLayoutProperty('region-zones-border', 'visibility', 'none');
+      if (map.getLayer('region-fill'))         map.setLayoutProperty('region-fill', 'visibility', 'visible');
+      if (map.getSource('region-zones'))
+        map.getSource('region-zones').setData({ type: 'FeatureCollection', features: [] });
     }
-  }, [mapMode, regionId]);
-
-  // ── Refine mode toggle (swap layer visibility when zones are active) ──────
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map?.getLayer('region-zones-fill') || mapMode !== 'zones') return;
-    const showNormal = ['region-zones-fill', 'region-zones-border'];
-    const showHD     = ['region-zones-fill-hd', 'region-zones-border-hd'];
-    const [show, hide] = refineMode ? [showHD, showNormal] : [showNormal, showHD];
-    for (const id of show) map.setLayoutProperty(id, 'visibility', 'visible');
-    for (const id of hide) map.setLayoutProperty(id, 'visibility', 'none');
-  }, [refineMode, mapMode]);
+  }, [mapMode, regionId, refineMode]);
 
   // ── Layer toggle handlers ─────────────────────────────────────────────────
 
