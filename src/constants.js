@@ -98,6 +98,21 @@ export function swapBasemap(map, basemap, theme) {
     map.setPaintProperty('borders', 'line-opacity', basemap === 'satellite' ? 0.45 : 1);
 }
 
+export function toggleSatLabels(map, show, theme) {
+  if (!map) return;
+  if (map.getLayer('sat-labels')) map.removeLayer('sat-labels');
+  if (map.getSource('sat-labels-tiles')) map.removeSource('sat-labels-tiles');
+  if (!show) return;
+  const variant = theme === 'dark' ? 'dark_only_labels' : 'light_only_labels';
+  map.addSource('sat-labels-tiles', {
+    type: 'raster',
+    tiles: ['a','b','c','d'].map(s => `https://${s}.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}@2x.png`),
+    tileSize: 256,
+    attribution: '© OpenStreetMap contributors © CARTO',
+  });
+  map.addLayer({ id: 'sat-labels', type: 'raster', source: 'sat-labels-tiles', paint: { 'raster-opacity': 0.9 } });
+}
+
 export const PLANT_STATUSES = ['operating', 'construction', 'planned'];
 
 /** MapLibre match expression: feature fuel property → hex color */

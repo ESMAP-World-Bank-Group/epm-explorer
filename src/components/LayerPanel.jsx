@@ -79,7 +79,7 @@ export default function LayerPanel({
   minMw, circleScale,
   plantSource, gppdAvailable, gemAvailable,
   presentFuels,
-  basemap, onBasemap,
+  basemap, onBasemap, satLabels, onSatLabels,
   onToggleFuel, onToggleStatus,
   onToggleKv, onToggleLines, onTogglePlants, onToggleSubs,
   onMinMwChange, onCircleScaleChange, onSourceChange,
@@ -154,6 +154,19 @@ export default function LayerPanel({
               );
             })}
           </div>
+          {basemap === 'satellite' && onSatLabels && (
+            <button onClick={() => onSatLabels(!satLabels)} style={{
+              marginTop: 5, width: '100%', fontSize: '0.5rem', padding: '3px 0',
+              borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit',
+              letterSpacing: '0.5px',
+              border: `1px solid ${satLabels ? 'rgba(74,143,204,0.6)' : t.panelBorder}`,
+              backgroundColor: satLabels ? 'rgba(74,143,204,0.12)' : 'transparent',
+              color: satLabels ? t.lbl : t.lblMuted,
+              transition: 'all 0.15s',
+            }}>
+              {satLabels ? '✓ ' : ''}Labels
+            </button>
+          )}
         </div>
       )}
 

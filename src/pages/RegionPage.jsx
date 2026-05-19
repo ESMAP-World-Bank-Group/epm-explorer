@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
 import {
-  getT, mapStyle, swapBasemap, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT,
+  getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT,
   plantRadiusExpr, fuelColorExpr, PLANT_STATUSES,
 } from '../constants';
 import LayerPanel from '../components/LayerPanel';
@@ -79,6 +79,7 @@ export default function RegionPage() {
   const [plantSource,   setPlantSource]   = useState('osm');
   const [activeTab,     setActiveTab]     = useState('overview');
   const [basemap,       setBasemap]       = useState('minimal');
+  const [satLabels,     setSatLabels]     = useState(false);
 
   // Static data
   useEffect(() => {
@@ -313,7 +314,14 @@ export default function RegionPage() {
     const map = mapRef.current;
     if (!map) return;
     swapBasemap(map, basemap, theme);
+    if (basemap !== 'satellite') toggleSatLabels(map, false, theme);
   }, [basemap, theme]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || basemap !== 'satellite') return;
+    toggleSatLabels(map, satLabels, theme);
+  }, [satLabels, basemap, theme]);
 
   // ── Layer toggle handlers ─────────────────────────────────────────────────
 
@@ -528,7 +536,7 @@ export default function RegionPage() {
         plantSource={plantSource}
         gppdAvailable={gppdAvailable} gemAvailable={gemAvailable}
         presentFuels={presentFuels}
-        basemap={basemap} onBasemap={setBasemap}
+        basemap={basemap} onBasemap={setBasemap} satLabels={satLabels} onSatLabels={setSatLabels}
         onToggleFuel={toggleFuel} onToggleStatus={toggleStatus}
         onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
