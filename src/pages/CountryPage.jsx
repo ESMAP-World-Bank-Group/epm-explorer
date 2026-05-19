@@ -250,7 +250,7 @@ export default function CountryPage() {
         type: 'fill',
         source: 'countries',
         filter: hlFilter,
-        paint: { 'fill-color': hl.fill, 'fill-opacity': 0.35 },
+        paint: { 'fill-color': hl.fill, 'fill-opacity': 0.08 },
       });
       map.addLayer({
         id: 'country-border',
@@ -734,7 +734,7 @@ export default function CountryPage() {
               color: t.lblMuted, textTransform: 'uppercase', display: 'block', marginBottom: 6,
             }}>Zones</span>
             <div style={{ display: 'flex', gap: 3, marginBottom: 6 }}>
-              {[['admin', 'Admin'], ['modeling', 'Clustering']].map(([mode, label]) => {
+              {[['plain', 'Plain'], ['admin', 'Admin'], ['modeling', 'Clustering']].map(([mode, label]) => {
                 const active = zoneMode === mode;
                 const disabled = mode === 'modeling' && !(zonesIndex[iso]?.length);
                 return (

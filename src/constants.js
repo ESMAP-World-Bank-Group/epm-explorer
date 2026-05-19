@@ -30,8 +30,8 @@ export const VOLTAGE_BRACKETS = [
 
 // Neutral highlight for country/region fills on the map (independent of region accent color)
 export const HIGHLIGHT = {
-  dark:  { fill: 'rgba(55,110,185,0.25)',  border: 'rgba(130,200,255,0.75)', borderW: 1.2 },
-  light: { fill: 'rgba(95,130,170,0.22)',  border: 'rgba(65,100,145,0.75)',  borderW: 1.0 },
+  dark:  { fill: 'rgba(55,110,185,1)',  border: 'rgba(130,200,255,0.75)', borderW: 1.2 },
+  light: { fill: 'rgba(95,130,170,1)',  border: 'rgba(65,100,145,0.75)',  borderW: 1.0 },
 };
 
 export const DARK = {
