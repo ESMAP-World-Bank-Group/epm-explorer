@@ -5,6 +5,9 @@ import { useTheme } from '../App';
 import { getT, mapStyle, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CountryOverview from '../components/CountryOverview';
+import REResourcesTab from '../components/tabs/REResourcesTab';
+import LoadTab from '../components/tabs/LoadTab';
+import ZoningTab from '../components/tabs/ZoningTab';
 
 function downloadBlob(content, filename, type = 'application/octet-stream') {
   const blob = new Blob([content], { type });
@@ -77,6 +80,8 @@ export default function CountryPage() {
   const [access,             setAccess]             = useState(null);
   const [filteredPlantsData, setFilteredPlantsData] = useState(null);
   const [filteredLinesData,  setFilteredLinesData]  = useState(null);
+  const [countryCenter,      setCountryCenter]      = useState(null);
+  const [activeTab,          setActiveTab]          = useState('overview');
   const countryFeatureRef = useRef(null);
 
   // Static data — fetch once
@@ -101,7 +106,8 @@ export default function CountryPage() {
     });
     setFuelsOff(new Set()); setKvsOff(new Set());
     setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
-    setPlantSource('osm'); setGppdAvailable(null); countryFeatureRef.current = null;
+    setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
+    countryFeatureRef.current = null;
   }, [iso]);
 
   useEffect(() => {
@@ -140,7 +146,13 @@ export default function CountryPage() {
       });
 
       const bounds = fitBoundsCountry(iso, countries);
-      if (bounds) map.fitBounds(bounds, { padding: 60, duration: 0, maxZoom: 9 });
+      if (bounds) {
+        map.fitBounds(bounds, { padding: 60, duration: 0, maxZoom: 9 });
+        setCountryCenter({
+          lon: (bounds[0][0] + bounds[1][0]) / 2,
+          lat: (bounds[0][1] + bounds[1][1]) / 2,
+        });
+      }
 
       // Filter plants strictly inside the country polygon (point-in-polygon)
       // Lines filtered by bbox (segments cross borders by nature)
@@ -479,86 +491,136 @@ export default function CountryPage() {
 
       {/* Right panel */}
       <div style={{
-        width: 260, height: 'calc(100vh - 46px)', overflowY: 'auto',
-        padding: '18px 16px',
+        width: 268, height: 'calc(100vh - 46px)', overflowY: 'auto',
         backgroundColor: t.panel,
         borderLeft: `1px solid ${t.panelBorder}`,
-        flexShrink: 0,
+        flexShrink: 0, display: 'flex', flexDirection: 'column',
       }}>
-        {/* Breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-          <Link to="/"                     style={{ fontSize: '0.75rem', color: t.muted }}>World</Link>
-          <span style={{ color: t.panelBorder, fontSize: '0.75rem' }}>/</span>
-          <Link to={`/region/${region.id}`} style={{ fontSize: '0.75rem', color: t.muted }}>{region.name}</Link>
-          <span style={{ color: t.panelBorder, fontSize: '0.75rem' }}>/</span>
-          <span style={{ fontSize: '0.75rem', color: t.lbl, fontWeight: 600 }}>{country.name}</span>
-        </div>
-
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: t.text, marginBottom: 8 }}>
-          {country.name}
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-          <span style={{
-            fontSize: '0.68rem', fontWeight: 600, color: 'white',
-            backgroundColor: region.color, borderRadius: 4,
-            padding: '2px 8px', display: 'inline-block',
-          }}>
-            {iso}
-          </span>
-          <div style={{ height: 3, width: 24, borderRadius: 2, backgroundColor: region.color }} />
-        </div>
-
-        <CountryOverview
-          iso={iso}
-          region={region}
-          capacity={capacity}
-          fleetAge={fleetAge}
-          tariffs={tariffs}
-          access={access}
-          theme={theme}
-          source={plantSource}
-        />
-
-        {/* Export section */}
-        <div style={{ marginTop: 16, borderTop: `1px solid ${t.panelBorder}`, paddingTop: 12 }}>
-          <span style={{ fontSize: '0.47rem', letterSpacing: '2px', fontWeight: 700, color: t.lblMuted, textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
-            Export Data
-          </span>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {[
-              { label: 'Plants GeoJSON', handler: () => handleDownloadPlants('geojson') },
-              { label: 'Plants CSV',     handler: () => handleDownloadPlants('csv') },
-              { label: 'Lines GeoJSON',  handler: () => handleDownloadLines('geojson') },
-              { label: 'Lines CSV',      handler: () => handleDownloadLines('csv') },
-            ].map(({ label, handler }) => (
-              <button key={label} onClick={handler} style={{
-                background: 'none', border: `1px solid ${t.panelBorder}`,
-                borderRadius: 3, padding: '4px 6px', cursor: 'pointer',
-                fontSize: '0.52rem', color: t.muted, fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-              }}>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                {label}
-              </button>
-            ))}
+        {/* ── Fixed header ── */}
+        <div style={{ padding: '14px 16px 0', flexShrink: 0 }}>
+          {/* Breadcrumb */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+            <Link to="/" style={{ fontSize: '0.68rem', color: t.muted }}>World</Link>
+            <span style={{ color: t.panelBorder, fontSize: '0.68rem' }}>/</span>
+            <Link to={`/region/${region.id}`} style={{ fontSize: '0.68rem', color: t.muted }}>{region.name}</Link>
+            <span style={{ color: t.panelBorder, fontSize: '0.68rem' }}>/</span>
+            <span style={{ fontSize: '0.68rem', color: t.lbl, fontWeight: 600 }}>{country.name}</span>
           </div>
-          <p style={{ fontSize: '0.47rem', color: t.lblMuted, marginTop: 6, fontStyle: 'italic' }}>
-            Source: {plantSource.toUpperCase()} · {country.name} only
-          </p>
+
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: t.text, marginBottom: 6 }}>
+            {country.name}
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{
+              fontSize: '0.68rem', fontWeight: 600, color: 'white',
+              backgroundColor: region.color, borderRadius: 4,
+              padding: '2px 8px', display: 'inline-block',
+            }}>
+              {iso}
+            </span>
+            <div style={{ height: 3, width: 24, borderRadius: 2, backgroundColor: region.color }} />
+          </div>
+
+          {/* ── Tab buttons ── */}
+          <div style={{ display: 'flex', gap: 3, marginBottom: 0 }}>
+            {[
+              { id: 'overview', label: 'Overview' },
+              { id: 're',       label: 'RE' },
+              { id: 'load',     label: 'Load' },
+              { id: 'zoning',   label: 'Zones' },
+            ].map(({ id, label }) => {
+              const active = activeTab === id;
+              return (
+                <button key={id} onClick={() => setActiveTab(id)} style={{
+                  flex: 1, fontSize: '0.48rem', letterSpacing: '0.5px',
+                  textTransform: 'uppercase', fontFamily: 'inherit',
+                  padding: '4px 0', borderRadius: '3px 3px 0 0',
+                  cursor: 'pointer',
+                  border: `1px solid ${active ? t.panelBorder : 'rgba(128,160,192,0.18)'}`,
+                  borderBottom: active ? `1px solid ${t.panel}` : `1px solid ${t.panelBorder}`,
+                  backgroundColor: active ? t.panel : 'transparent',
+                  color: active ? t.lbl : t.lblMuted,
+                  fontWeight: active ? 700 : 400,
+                  position: 'relative', zIndex: active ? 2 : 1,
+                }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ height: 1, backgroundColor: t.panelBorder, marginTop: -1, position: 'relative', zIndex: 0 }} />
         </div>
 
-        <div style={{ borderTop: `1px solid ${t.hr}`, paddingTop: 12, marginTop: 16 }}>
-          <Link
-            to={`/region/${region.id}`}
-            style={{ fontSize: '0.75rem', color: region.color, display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-            ← Back to {region.name}
-          </Link>
+        {/* ── Scrollable tab content ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px' }}>
+
+          {activeTab === 'overview' && (
+            <>
+              <CountryOverview
+                iso={iso}
+                region={region}
+                capacity={capacity}
+                fleetAge={fleetAge}
+                tariffs={tariffs}
+                access={access}
+                theme={theme}
+                source={plantSource}
+              />
+              {/* Export */}
+              <div style={{ marginTop: 16, borderTop: `1px solid ${t.panelBorder}`, paddingTop: 12 }}>
+                <span style={{ fontSize: '0.47rem', letterSpacing: '2px', fontWeight: 700, color: t.lblMuted, textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
+                  Export Data
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {[
+                    { label: 'Plants GeoJSON', fn: () => handleDownloadPlants('geojson') },
+                    { label: 'Plants CSV',     fn: () => handleDownloadPlants('csv') },
+                    { label: 'Lines GeoJSON',  fn: () => handleDownloadLines('geojson') },
+                    { label: 'Lines CSV',      fn: () => handleDownloadLines('csv') },
+                  ].map(({ label, fn }) => (
+                    <button key={label} onClick={fn} style={{
+                      background: 'none', border: `1px solid ${t.panelBorder}`,
+                      borderRadius: 3, padding: '4px 6px', cursor: 'pointer',
+                      fontSize: '0.52rem', color: t.muted, fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ fontSize: '0.47rem', color: t.lblMuted, marginTop: 6, fontStyle: 'italic' }}>
+                  Source: {plantSource.toUpperCase()} · {country.name} only
+                </p>
+              </div>
+            </>
+          )}
+
+          {activeTab === 're' && (
+            <REResourcesTab center={countryCenter} theme={theme} />
+          )}
+
+          {activeTab === 'load' && (
+            <LoadTab iso={iso} theme={theme} />
+          )}
+
+          {activeTab === 'zoning' && (
+            <ZoningTab iso={iso} theme={theme} />
+          )}
+
+          <div style={{ borderTop: `1px solid ${t.hr}`, paddingTop: 12, marginTop: 20 }}>
+            <Link
+              to={`/region/${region.id}`}
+              style={{ fontSize: '0.72rem', color: region.color, display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              ← Back to {region.name}
+            </Link>
+          </div>
         </div>
       </div>
     </div>
