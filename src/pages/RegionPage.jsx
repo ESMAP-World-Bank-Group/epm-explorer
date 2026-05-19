@@ -196,7 +196,7 @@ export default function RegionPage() {
       map.addLayer({ id: 'region-fill', type: 'fill', source: 'countries',
         filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'fill-color': hl.fill,
-          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.55, 1.0] } });
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.18, 0.08] } });
       map.addLayer({ id: 'region-border', type: 'line', source: 'countries',
         filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'line-color': hl.border, 'line-width': hl.borderW, 'line-opacity': 0.9 } });
