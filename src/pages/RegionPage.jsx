@@ -4,7 +4,7 @@ import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
 import {
   getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS,
-  plantRadiusExpr, lcRadiusExpr, fuelColorExpr, PLANT_STATUSES,
+  plantRadiusExpr, lcRadiusExpr, fuelColorExpr, PLANT_STATUSES, zoneColorExpr,
 } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CapacityChart from '../components/CapacityChart';
@@ -83,6 +83,8 @@ export default function RegionPage() {
   const [activeTab,       setActiveTab]       = useState('overview');
   const [basemap,         setBasemap]         = useState('minimal');
   const [satLabels,       setSatLabels]       = useState(false);
+  const [mapMode,         setMapMode]         = useState('countries');
+  const [zonesAvailable,  setZonesAvailable]  = useState(false);
 
   // Static data
   useEffect(() => {
@@ -103,6 +105,10 @@ export default function RegionPage() {
     setLoadCentersOn(false); setLcMinPop(300_000); setLcCircleScale(1.0);
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
+
+    setMapMode('countries'); setZonesAvailable(false);
+    fetch(`/data/zones/${regionId}_preferred_zones.geojson`, { method: 'HEAD' })
+      .then(r => setZonesAvailable(r.ok)).catch(() => {});
 
     setGppdAvailable(null);
     fetch(`/data/cache/region_plants_${regionId}_gppd.geojson`, { method: 'HEAD' })
@@ -201,6 +207,31 @@ export default function RegionPage() {
         filter: ['in', ['get', 'ISO_A3'], ['literal', expandedIsos]],
         paint: { 'line-color': hl.border, 'line-width': hl.borderW, 'line-opacity': 0.9 } });
 
+
+      // Preferred zones overlay (hidden until mapMode === 'zones')
+      map.addSource('region-zones', {
+        type: 'geojson', data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({ id: 'region-zones-fill', type: 'fill', source: 'region-zones',
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': zoneColorExpr(), 'fill-opacity': 0.35 },
+      });
+      map.addLayer({ id: 'region-zones-border', type: 'line', source: 'region-zones',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': tv.isDark ? '#bbb' : '#444', 'line-width': 1.2, 'line-opacity': 0.7 },
+      });
+      map.addLayer({ id: 'region-zones-labels', type: 'symbol', source: 'region-zones',
+        layout: {
+          visibility: 'none',
+          'text-field': ['get', 'zone_id'], 'text-size': 10,
+          'text-anchor': 'center', 'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': tv.isDark ? '#eee' : '#111',
+          'text-halo-color': tv.isDark ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.88)',
+          'text-halo-width': 1.5,
+        },
+      });
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
       const fuels = new Set();
@@ -363,6 +394,31 @@ export default function RegionPage() {
     if (!map || basemap !== 'satellite') return;
     toggleSatLabels(map, satLabels, theme);
   }, [satLabels, basemap, theme]);
+
+  // ── Zone mode toggle ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer('region-zones-fill')) return;
+    const showZones = mapMode === 'zones';
+    if (showZones) {
+      fetch(`/data/zones/${regionId}_preferred_zones.geojson`)
+        .then(r => r.json())
+        .then(data => {
+          if (!mapRef.current?.getSource('region-zones')) return;
+          mapRef.current.getSource('region-zones').setData(data);
+          for (const id of ['region-zones-fill', 'region-zones-border', 'region-zones-labels'])
+            mapRef.current.setLayoutProperty(id, 'visibility', 'visible');
+          mapRef.current.setLayoutProperty('region-fill', 'visibility', 'none');
+        })
+        .catch(() => setMapMode('countries'));
+    } else {
+      for (const id of ['region-zones-fill', 'region-zones-border', 'region-zones-labels'])
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+      if (map.getLayer('region-fill')) map.setLayoutProperty('region-fill', 'visibility', 'visible');
+      if (map.getSource('region-zones'))
+        map.getSource('region-zones').setData({ type: 'FeatureCollection', features: [] });
+    }
+  }, [mapMode, regionId]);
 
   // ── Layer toggle handlers ─────────────────────────────────────────────────
 
@@ -618,8 +674,35 @@ export default function RegionPage() {
         onDownloadLines={handleDownloadLines}
       />
 
-      <div ref={containerRef}
-        style={{ flex: 1, height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
+      <div style={{ position: 'relative', flex: 1 }}>
+        <div ref={containerRef}
+          style={{ width: '100%', height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
+        {zonesAvailable && (
+          <div style={{
+            position: 'absolute', top: 10, left: 10, zIndex: 10,
+            display: 'flex', gap: 2,
+            background: t.panel, borderRadius: 6,
+            border: `1px solid ${t.panelBorder}`,
+            padding: 3, boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+          }}>
+            {[['countries', 'Countries'], ['zones', 'Zones']].map(([mode, label]) => {
+              const active = mapMode === mode;
+              return (
+                <button key={mode} onClick={() => setMapMode(mode)} style={{
+                  fontSize: '0.6rem', letterSpacing: '0.6px', textTransform: 'uppercase',
+                  fontFamily: 'inherit', padding: '3px 10px', borderRadius: 4,
+                  cursor: 'pointer', border: 'none',
+                  backgroundColor: active ? t.lbl : 'transparent',
+                  color: active ? (t.isDark ? '#111' : '#fff') : t.lblMuted,
+                  fontWeight: active ? 700 : 400, transition: 'background 0.15s',
+                }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Right panel */}
       <div style={{

@@ -163,6 +163,26 @@ export function toggleSatLabels(map, show, theme) {
 
 export const PLANT_STATUSES = ['operating', 'construction', 'planned'];
 
+// Per-country colors for preferred-zoning overlays — blues, greens, yellows (no orange/violet)
+export const COUNTRY_ZONE_COLORS = {
+  // Black Sea
+  TUR: '#3D9BD4', ROU: '#52B788', ARM: '#E9C46A', AZE: '#2A9D8F', BGR: '#4895EF', GEO: '#90BE6D',
+  // SAPP
+  ZAF: '#1E88E5', ZWE: '#43A047', ZMB: '#FFD54F', BWA: '#26C6DA', MOZ: '#66BB6A',
+  MWI: '#FFF176', NAM: '#29B6F6', LSO: '#A5D6A7', SWZ: '#80DEEA', AGO: '#B5EAD7', MDG: '#FFFFB5',
+  // EAPP
+  EGY: '#FFD700', ETH: '#2E86AB', KEN: '#57CC99', UGA: '#48CAE4', TZA: '#C7F2A4',
+  RWA: '#80ED99', BDI: '#CFEE9E', SDN: '#F4D35E', SSD: '#A8E6CF', DJI: '#56CFE1',
+  COD: '#5E9CF4', SOM: '#B8F2E6',
+};
+
+export function zoneColorExpr() {
+  return ['match', ['get', 'country'],
+    ...Object.entries(COUNTRY_ZONE_COLORS).flatMap(([iso, c]) => [iso, c]),
+    '#888888',
+  ];
+}
+
 export function fuelColorExpr() {
   return ['match', ['get', 'fuel'],
     ...Object.entries(FUEL_COLORS).flatMap(([f, c]) => [f, c]),

@@ -87,7 +87,7 @@ export default function CountryPage() {
   const [loadCentersOn,      setLoadCentersOn]      = useState(true);
   const [lcMinPop,           setLcMinPop]           = useState(300_000);
   const [lcCircleScale,      setLcCircleScale]      = useState(1.0);
-  const [zoneMode,           setZoneMode]           = useState('admin');
+  const [zoneMode,           setZoneMode]           = useState('plain');
   const [nZones,             setNZones]             = useState(null);
   const [zonesIndex,         setZonesIndex]         = useState(null);
   const [zoneLabelsOn,       setZoneLabelsOn]       = useState(true);
@@ -119,7 +119,7 @@ export default function CountryPage() {
     setLinesOn(true); setPlantsOn(true); setSubsOn(false); setMinMw(100); setCircleScale(1.0);
     setLcCircleScale(1.0);
     setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
-    setZoneMode('admin'); setNZones(null); setZoneLabelsOn(true);
+    setZoneMode('plain'); setNZones(null); setZoneLabelsOn(true);
     mapReadyRef.current = false;
     countryFeatureRef.current = null;
   }, [iso]);
