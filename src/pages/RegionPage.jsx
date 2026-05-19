@@ -427,14 +427,14 @@ export default function RegionPage() {
     const url  = `/data/cache/region_plants_${regionId}${suffix}.geojson`;
     const data = await fetch(url).then(r => r.json());
     if (format === 'csv') {
-      const header = 'name,fuel,mw,country,status,lat,lon';
+      const header = 'name,fuel,mw,country,status,lat,lon,source';
       const rows = data.features.map(f => {
         const p = f.properties;
         const [lon, lat] = f.geometry.coordinates;
         return [
           `"${(p.name || '').replace(/"/g, '""')}"`,
           p.fuel || '', p.mw || '', p.country || '', p.status || '',
-          lat.toFixed(5), lon.toFixed(5),
+          lat.toFixed(5), lon.toFixed(5), plantSource,
         ].join(',');
       });
       downloadBlob([header, ...rows].join('\n'), `plants_${regionId}${suffix}.csv`, 'text/csv');

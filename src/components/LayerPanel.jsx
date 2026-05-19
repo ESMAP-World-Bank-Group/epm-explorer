@@ -189,8 +189,8 @@ export default function LayerPanel({
         </>
       )}
 
-      {/* Status filter */}
-      <div style={{ marginBottom: 6 }}>
+      {/* Status filter — only when handler provided (RegionPage) */}
+      {onToggleStatus && <div style={{ marginBottom: 6 }}>
         <span style={{ ...sec, fontSize: '0.44rem', display: 'block', marginBottom: 4 }}>Status</span>
         {STATUS_CONFIG.map(({ key, label, symbol: Symbol }) => {
           const off = statusOff?.has(key);
@@ -203,7 +203,7 @@ export default function LayerPanel({
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* Fuel rows */}
       <div style={{ marginBottom: 8 }}>

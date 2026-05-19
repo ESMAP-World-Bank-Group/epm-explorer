@@ -6,6 +6,14 @@ import { getT, mapStyle, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusEx
 import LayerPanel from '../components/LayerPanel';
 import CountryOverview from '../components/CountryOverview';
 
+function downloadBlob(content, filename, type = 'application/octet-stream') {
+  const blob = new Blob([content], { type });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // Ray-casting point-in-polygon (handles Polygon + MultiPolygon)
 function pointInRing(pt, ring) {
   let inside = false;
@@ -61,12 +69,14 @@ export default function CountryPage() {
   const [subsOn,       setSubsOn]       = useState(true);
   const [minMw,        setMinMw]        = useState(100);
   const [circleScale,  setCircleScale]  = useState(1.0);
-  const [plantSource,   setPlantSource]   = useState('osm');
-  const [gppdAvailable, setGppdAvailable] = useState(null);
-  const [capacity,      setCapacity]      = useState(null);
-  const [fleetAge,      setFleetAge]      = useState(null);
-  const [tariffs,       setTariffs]       = useState(null);
-  const [access,        setAccess]        = useState(null);
+  const [plantSource,        setPlantSource]        = useState('osm');
+  const [gppdAvailable,      setGppdAvailable]      = useState(null);
+  const [capacity,           setCapacity]           = useState(null);
+  const [fleetAge,           setFleetAge]           = useState(null);
+  const [tariffs,            setTariffs]            = useState(null);
+  const [access,             setAccess]             = useState(null);
+  const [filteredPlantsData, setFilteredPlantsData] = useState(null);
+  const [filteredLinesData,  setFilteredLinesData]  = useState(null);
   const countryFeatureRef = useRef(null);
 
   // Static data — fetch once
@@ -159,6 +169,9 @@ export default function CountryPage() {
           ),
         };
       }
+
+      setFilteredPlantsData(filteredPlants);
+      setFilteredLinesData(filteredLines);
 
       map.addSource('countries',   { type: 'geojson', data: countries, generateId: false });
       map.addSource('plants',      { type: 'geojson', data: filteredPlants });
@@ -373,6 +386,7 @@ export default function CountryPage() {
           features: data.features.filter(f => pointInFeature(f.geometry.coordinates, cf)),
         };
         map.getSource('plants').setData(filtered);
+        setFilteredPlantsData(filtered);
         const fuels = new Set(filtered.features.map(f => f.properties.fuel).filter(f => FUEL_COLORS[f]));
         setPresentFuels(fuels);
       })
@@ -401,6 +415,44 @@ export default function CountryPage() {
       .catch(() => setFleetAge(null));
   }, [plantSource, info]);
 
+  // ── Download handlers ────────────────────────────────────────────────────
+
+  const handleDownloadPlants = useCallback((format = 'geojson') => {
+    if (!filteredPlantsData) return;
+    const suffix = plantSource === 'gppd' ? '_gppd' : plantSource === 'gem' ? '_gem' : '';
+    if (format === 'csv') {
+      const header = 'name,fuel,mw,country,status,lat,lon,source';
+      const rows = filteredPlantsData.features.map(f => {
+        const p = f.properties;
+        const [lon, lat] = f.geometry.coordinates;
+        return [
+          `"${(p.name || '').replace(/"/g, '""')}"`,
+          p.fuel || '', p.mw || '', p.country || '',
+          p.status || 'operating', lat.toFixed(5), lon.toFixed(5),
+          plantSource,
+        ].join(',');
+      });
+      downloadBlob([header, ...rows].join('\n'), `plants_${iso}${suffix}.csv`, 'text/csv');
+    } else {
+      downloadBlob(JSON.stringify(filteredPlantsData), `plants_${iso}.geojson`, 'application/geo+json');
+    }
+  }, [filteredPlantsData, iso, plantSource]);
+
+  const handleDownloadLines = useCallback((format = 'geojson') => {
+    if (!filteredLinesData) return;
+    if (format === 'csv') {
+      const header = 'id,voltage_kv,geometry_wkt';
+      const rows = filteredLinesData.features.map((f, i) => {
+        const vkv = f.properties.v ? Math.round(f.properties.v / 1000) : '';
+        const wkt = `LINESTRING(${f.geometry.coordinates.map(([x, y]) => `${x} ${y}`).join(', ')})`;
+        return `${i},${vkv},"${wkt}"`;
+      });
+      downloadBlob([header, ...rows].join('\n'), `lines_${iso}.csv`, 'text/csv');
+    } else {
+      downloadBlob(JSON.stringify(filteredLinesData), `lines_${iso}.geojson`, 'application/geo+json');
+    }
+  }, [filteredLinesData, iso]);
+
   if (!info) return <div style={{ padding: 40, color: t.text }}>Loading…</div>;
 
   const { country, region } = info;
@@ -419,6 +471,8 @@ export default function CountryPage() {
         onToggleSubs={toggleSubs}
         onMinMwChange={handleMinMw} onCircleScaleChange={handleCircleScale}
         onSourceChange={setPlantSource}
+        onDownloadPlants={handleDownloadPlants}
+        onDownloadLines={handleDownloadLines}
       />
 
       <div ref={containerRef} style={{ flex: 1, height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
@@ -465,7 +519,40 @@ export default function CountryPage() {
           source={plantSource}
         />
 
-        <div style={{ borderTop: `1px solid ${t.hr}`, paddingTop: 12, marginTop: 4 }}>
+        {/* Export section */}
+        <div style={{ marginTop: 16, borderTop: `1px solid ${t.panelBorder}`, paddingTop: 12 }}>
+          <span style={{ fontSize: '0.47rem', letterSpacing: '2px', fontWeight: 700, color: t.lblMuted, textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>
+            Export Data
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            {[
+              { label: 'Plants GeoJSON', handler: () => handleDownloadPlants('geojson') },
+              { label: 'Plants CSV',     handler: () => handleDownloadPlants('csv') },
+              { label: 'Lines GeoJSON',  handler: () => handleDownloadLines('geojson') },
+              { label: 'Lines CSV',      handler: () => handleDownloadLines('csv') },
+            ].map(({ label, handler }) => (
+              <button key={label} onClick={handler} style={{
+                background: 'none', border: `1px solid ${t.panelBorder}`,
+                borderRadius: 3, padding: '4px 6px', cursor: 'pointer',
+                fontSize: '0.52rem', color: t.muted, fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+              }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.47rem', color: t.lblMuted, marginTop: 6, fontStyle: 'italic' }}>
+            Source: {plantSource.toUpperCase()} · {country.name} only
+          </p>
+        </div>
+
+        <div style={{ borderTop: `1px solid ${t.hr}`, paddingTop: 12, marginTop: 16 }}>
           <Link
             to={`/region/${region.id}`}
             style={{ fontSize: '0.75rem', color: region.color, display: 'flex', alignItems: 'center', gap: 5 }}
