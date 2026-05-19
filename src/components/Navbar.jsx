@@ -92,26 +92,20 @@ export default function Navbar() {
           </svg>
           Regional Power <span style={{ fontWeight: 400 }}>Explorer</span>
         </Link>
+        <span style={{
+          fontSize: '0.48rem', fontWeight: 700, letterSpacing: '1.5px',
+          color: 'rgba(74,143,204,0.7)', textTransform: 'uppercase',
+          border: '1px solid rgba(74,143,204,0.3)', borderRadius: 3,
+          padding: '1px 5px', lineHeight: 1,
+        }}>
+          Beta
+        </span>
         {crumb && (
           <>
             <span style={{ color: t.panelBorder, fontSize: '0.75rem' }}>›</span>
             <span style={{ fontSize: '0.75rem', color: t.lbl }}>{crumb}</span>
           </>
         )}
-      </div>
-
-      {/* Center: WB · ESMAP branding */}
-      <div style={{
-        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        pointerEvents: 'none',
-      }}>
-        <div style={{
-          fontSize: '0.52rem', fontWeight: 700, letterSpacing: '2.5px',
-          color: t.lblMuted, textTransform: 'uppercase', lineHeight: 1.3, opacity: 0.7,
-        }}>
-          World Bank · ESMAP
-        </div>
       </div>
 
       {/* Right: theme toggle | EPM Suite | Data Sources | Contact */}

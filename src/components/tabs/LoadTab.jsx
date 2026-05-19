@@ -21,10 +21,11 @@ const ENTSOE_ISO3 = new Set(['ROU','BGR','TUR','ALB','BIH','MKD','MNE','SRB','KO
   'GEO','ARM','AZE','MAR','DZA','TUN','EGY']);
 
 const PROFILE_EUROPEAN = [42,38,35,33,32,33,38,56,75,82,85,86,87,87,85,83,84,88,93,96,91,78,65,52];
+const PROFILE_AVERAGE  = [44,40,37,35,34,36,43,60,72,78,80,79,78,76,75,77,82,90,97,100,93,80,66,53];
 
 function getProfile(iso) {
-  if (ENTSOE_ISO3.has(iso)) return { data: PROFILE_EUROPEAN, label: 'Typical weekday · European grid (ENTSO-E shape)' };
-  return null;
+  if (ENTSOE_ISO3.has(iso)) return { data: PROFILE_EUROPEAN, label: 'Typical weekday · European grid (ENTSO-E shape)', specific: true };
+  return { data: PROFILE_AVERAGE, label: 'Typical weekday · Global average shape (illustrative)', specific: false };
 }
 
 function downloadBlob(content, filename, type = 'application/octet-stream') {
@@ -308,23 +309,15 @@ export default function LoadTab({ iso, theme }) {
       {/* ── Daily load profile ────────────────── */}
       <div style={{ borderTop: `1px solid ${t.panelBorder}`, paddingTop: 10 }}>
         <span style={sec}>Daily Load Profile</span>
-        {profile ? (
-          <>
-            <ProfileChart profile={profile.data} color="#74C0FC" t={t} />
-            <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic', lineHeight: 1.5 }}>
-              {profile.label}
-            </p>
-          </>
-        ) : (
-          <p style={{ fontSize: '0.62rem', color: t.muted, fontStyle: 'italic', lineHeight: 1.55 }}>
-            Representative load profiles are not available for this country.{' '}
-            <a href="https://transparency.entsoe.eu" target="_blank" rel="noopener noreferrer"
-              style={{ color: 'rgba(74,143,204,0.75)', textDecoration: 'none' }}>
-              ENTSO-E
-            </a>
-            {' '}data covers European countries only.
-          </p>
-        )}
+        <ProfileChart profile={profile.data} color={profile.specific ? '#74C0FC' : '#94A3B8'} t={t} />
+        <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic', lineHeight: 1.5 }}>
+          {profile.label}
+          {!profile.specific && (
+            <span style={{ color: 'rgba(250,180,50,0.8)', fontStyle: 'normal', marginLeft: 4 }}>
+              · No country-specific data available
+            </span>
+          )}
+        </p>
       </div>
     </div>
   );
