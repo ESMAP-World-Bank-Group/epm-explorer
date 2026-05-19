@@ -17,13 +17,10 @@ const ISO3_TO_ISO2 = {
   KAZ:'KZ', KGZ:'KG', TJK:'TJ', TKM:'TM', UZB:'UZ',
 };
 
-// Countries connected to ENTSO-E grid → European-shaped load profile
 const ENTSOE_ISO3 = new Set(['ROU','BGR','TUR','ALB','BIH','MKD','MNE','SRB','KOS',
   'GEO','ARM','AZE','MAR','DZA','TUN','EGY']);
 
-// Representative 24h weekday profiles (0–100 normalised)
-// European: morning + evening double peak
-const PROFILE_EUROPEAN  = [42,38,35,33,32,33,38,56,75,82,85,86,87,87,85,83,84,88,93,96,91,78,65,52];
+const PROFILE_EUROPEAN = [42,38,35,33,32,33,38,56,75,82,85,86,87,87,85,83,84,88,93,96,91,78,65,52];
 
 function getProfile(iso) {
   if (ENTSOE_ISO3.has(iso)) return { data: PROFILE_EUROPEAN, label: 'Typical weekday · European grid (ENTSO-E shape)' };
@@ -52,6 +49,12 @@ function linearFit(pts) {
   return { m, b };
 }
 
+function fmtTWh(v) {
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
+  if (v >= 10)   return v.toFixed(0);
+  return v.toFixed(1);
+}
+
 function TrendChart({ historical, projected, t }) {
   if (!historical.length) return null;
   const all     = [...historical, ...projected];
@@ -69,7 +72,7 @@ function TrendChart({ historical, projected, t }) {
     ? [`${toX(projStart[0]).toFixed(1)},${toY(projStart[1]).toFixed(1)}`,
        ...projected.map(([y, v]) => `${toX(y).toFixed(1)},${toY(v).toFixed(1)}`)].join(' ')
     : null;
-  const tickVals = [0, Math.round(maxVal * 0.5 / 100) * 100, Math.round(maxVal / 100) * 100];
+  const tickVals = [0, +(maxVal * 0.5).toFixed(1), +maxVal.toFixed(1)];
   const midProjYear = projected.length ? projected[Math.floor(projected.length / 2)][0] : null;
   const midProjVal  = projected.length ? projected[Math.floor(projected.length / 2)][1] : null;
 
@@ -82,18 +85,15 @@ function TrendChart({ historical, projected, t }) {
             <line x1={pL} y1={y} x2={pL + iW} y2={y}
               stroke={t.panelBorder} strokeWidth={0.5} strokeDasharray="2,2" />
             <text x={pL - 2} y={y + 3} textAnchor="end" fill={t.lblMuted} fontSize={6.5}>
-              {v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+              {fmtTWh(v)}
             </text>
           </g>
         );
       })}
-      {/* Y axis unit */}
       <text transform={`translate(8, ${pT + iH / 2}) rotate(-90)`}
-        textAnchor="middle" fill={t.lblMuted} fontSize={6}>kWh/cap</text>
-      {/* Historical */}
+        textAnchor="middle" fill={t.lblMuted} fontSize={6}>TWh/yr</text>
       <polyline points={histPts} fill="none" stroke="#4DABF7"
         strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-      {/* Projected dashed */}
       {projPts && (
         <>
           <polyline points={projPts} fill="none" stroke="#4DABF7"
@@ -107,7 +107,6 @@ function TrendChart({ historical, projected, t }) {
           )}
         </>
       )}
-      {/* X axis labels */}
       {[minYear, Math.round((minYear + maxYear) / 2), maxYear].map(yr => (
         <text key={yr} x={toX(yr)} y={H - 2} textAnchor="middle" fill={t.lblMuted} fontSize={7}>
           {yr}
@@ -145,28 +144,39 @@ function ProfileChart({ profile, color, t }) {
 
 export default function LoadTab({ iso, theme }) {
   const t = getT(theme);
-  const [wdi, setWdi]     = useState(null);
+  const [pts, setPts]       = useState(null); // [[year, TWh]]
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState(false);
 
   useEffect(() => {
     const iso2 = ISO3_TO_ISO2[iso];
     if (!iso2) { setError(true); return; }
-    setLoading(true); setError(false); setWdi(null);
-    fetch(`https://api.worldbank.org/v2/country/${iso2}/indicator/EG.USE.ELEC.KH.PC?format=json&per_page=60&mrv=30`)
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(([, rows]) => {
-        const pts = (rows || [])
-          .filter(r => r.value != null)
-          .map(r => [parseInt(r.date), Math.round(r.value)])
-          .sort(([a], [b]) => a - b);
-        setWdi(pts);
+    setLoading(true); setError(false); setPts(null);
+
+    const wdi = url => fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(([, rows]) =>
+        (rows || []).filter(r => r.value != null)
+          .map(r => [parseInt(r.date), r.value])
+          .sort(([a], [b]) => a - b)
+      );
+
+    const base = `https://api.worldbank.org/v2/country/${iso2}/indicator`;
+    Promise.all([
+      wdi(`${base}/EG.USE.ELEC.KH.PC?format=json&per_page=60&mrv=35`),
+      wdi(`${base}/SP.POP.TOTL?format=json&per_page=60&mrv=35`),
+    ])
+      .then(([pc, pop]) => {
+        const popMap = new Map(pop.map(([y, v]) => [y, v]));
+        const merged = pc
+          .filter(([y]) => popMap.has(y))
+          .map(([y, kwh_cap]) => [y, +(kwh_cap * popMap.get(y) / 1e9).toFixed(3)]);
+        setPts(merged);
         setLoading(false);
       })
       .catch(() => { setError(true); setLoading(false); });
   }, [iso]);
 
-  const historical = wdi || [];
+  const historical = pts || [];
   let projected = [];
   let cagr = null;
   if (historical.length >= 3) {
@@ -175,14 +185,18 @@ export default function LoadTab({ iso, theme }) {
       const lastYear = historical[historical.length - 1][0];
       projected = Array.from({ length: 11 }, (_, i) => {
         const yr = lastYear + i + 1;
-        return [yr, Math.max(0, Math.round(fit.m * yr + fit.b))];
+        return [yr, Math.max(0, +(fit.m * yr + fit.b).toFixed(3))];
       });
     }
-    // CAGR from first to last valid year
     const v0 = historical[0][1], v1 = historical[historical.length - 1][1];
     const n  = historical[historical.length - 1][0] - historical[0][0];
     if (v0 > 0 && n > 0) cagr = ((Math.pow(v1 / v0, 1 / n) - 1) * 100).toFixed(1);
   }
+
+  const lastTWh  = historical.length ? historical[historical.length - 1][1] : null;
+  const lastYear = historical.length ? historical[historical.length - 1][0] : null;
+  // Estimated peak: annual TWh / (8760 h × 0.55 load factor)
+  const peakGW   = lastTWh != null ? (lastTWh * 1000 / (8760 * 0.55)).toFixed(1) : null;
 
   const profile = getProfile(iso);
 
@@ -203,8 +217,8 @@ export default function LoadTab({ iso, theme }) {
 
   return (
     <div>
-      {/* ── Consumption trend ─────────────────── */}
-      <span style={sec}>Electricity Consumption</span>
+      {/* ── Total demand ─────────────────────── */}
+      <span style={sec}>Electricity Demand</span>
 
       {loading && <p style={{ fontSize: '0.62rem', color: t.muted, fontStyle: 'italic' }}>Loading…</p>}
       {error   && <p style={{ fontSize: '0.62rem', color: t.muted, fontStyle: 'italic' }}>No WB WDI data for this country.</p>}
@@ -214,15 +228,30 @@ export default function LoadTab({ iso, theme }) {
 
       {historical.length > 0 && (
         <>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, marginBottom: 6 }}>
-            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: t.lbl }}>
-              {historical[historical.length - 1][1].toLocaleString()}
-            </span>
-            <span style={{ fontSize: '0.53rem', color: t.lblMuted, marginBottom: 2 }}>
-              kWh / capita · {historical[historical.length - 1][0]}
-            </span>
+          {/* KPI row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 8 }}>
+            <div style={{ padding: '6px 8px', borderRadius: 5, backgroundColor: t.cardBg, border: `1px solid ${t.cardBorder}` }}>
+              <div style={{ fontSize: '0.42rem', color: t.lblMuted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2 }}>
+                Annual Demand
+              </div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: t.lbl }}>
+                {lastTWh != null ? `${fmtTWh(lastTWh)} TWh` : '—'}
+              </div>
+              <div style={{ fontSize: '0.42rem', color: t.lblMuted }}>{lastYear}</div>
+            </div>
+            <div style={{ padding: '6px 8px', borderRadius: 5, backgroundColor: t.cardBg, border: `1px solid ${t.cardBorder}` }}>
+              <div style={{ fontSize: '0.42rem', color: t.lblMuted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2 }}>
+                Est. Peak
+              </div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: t.lbl }}>
+                {peakGW != null ? `~${peakGW} GW` : '—'}
+              </div>
+              <div style={{ fontSize: '0.42rem', color: t.lblMuted }}>LF = 55%</div>
+            </div>
           </div>
+
           <TrendChart historical={historical} projected={projected} t={t} />
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
             <div style={{ display: 'flex', gap: 12 }}>
               {legend('#4DABF7', null,  'Historical (WB WDI)')}
@@ -240,39 +269,38 @@ export default function LoadTab({ iso, theme }) {
                   </span>
                 </div>
               )}
-              {historical.length > 0 && (
-                <button
-                  title="Download CSV"
-                  onClick={() => {
-                    const allRows = [
-                      ...historical.map(([year, val]) => `${year},${val},historical`),
-                      ...projected.map(([year, val]) => `${year},${val},projected`),
-                    ];
-                    downloadBlob(
-                      ['year,kwh_per_capita,type', ...allRows].join('\n'),
-                      `electricity_consumption_${iso}.csv`,
-                      'text/csv'
-                    );
-                  }}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    padding: '1px 3px', borderRadius: 3, color: t.lblMuted,
-                    display: 'inline-flex', alignItems: 'center', opacity: 0.7,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                </button>
-              )}
+              <button
+                title="Download CSV"
+                onClick={() => {
+                  const allRows = [
+                    ...historical.map(([year, val]) => `${year},${val},historical`),
+                    ...projected.map(([year, val]) => `${year},${val},projected`),
+                  ];
+                  downloadBlob(
+                    ['year,twh,type', ...allRows].join('\n'),
+                    `electricity_demand_${iso}.csv`,
+                    'text/csv'
+                  );
+                }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '1px 3px', borderRadius: 3, color: t.lblMuted,
+                  display: 'inline-flex', alignItems: 'center', opacity: 0.7,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
             </div>
           </div>
           <p style={{ fontSize: '0.46rem', color: t.lblMuted, marginTop: 3, fontStyle: 'italic', marginBottom: 14 }}>
-            Source: World Bank WDI · EG.USE.ELEC.KH.PC ·{' '}
-            {historical[0][0]}–{historical[historical.length - 1][0]}
+            WB WDI · EG.USE.ELEC.KH.PC × SP.POP.TOTL ·{' '}
+            {historical[0][0]}–{historical[historical.length - 1][0]} ·{' '}
+            Peak estimated from load factor (55%)
           </p>
         </>
       )}

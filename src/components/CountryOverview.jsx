@@ -114,32 +114,46 @@ export default function CountryOverview({ iso, region, capacity, fleetAge, tarif
       )}
 
       {/* ── Electricity tariff ───────────────── */}
-      {tariffData && (
-        <div style={{ marginBottom: 16 }}>
-          <span style={sec}>Electricity Tariff</span>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[['Residential', tariffData.res], ['Industrial', tariffData.ind]].map(([label, val]) => (
-              val != null ? (
-                <div key={label} style={{
-                  flex: 1, padding: '6px 8px', borderRadius: 5,
-                  backgroundColor: t.cardBg, border: `1px solid ${t.cardBorder}`,
-                }}>
-                  <div style={{ fontSize: '0.44rem', color: t.lblMuted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 3 }}>
-                    {label}
+      {tariffData && (() => {
+        const avg = (tariffData.res != null && tariffData.ind != null)
+          ? (tariffData.res + tariffData.ind) / 2 : null;
+        const maxVal = Math.max(tariffData.res ?? 0, tariffData.ind ?? 0, avg ?? 0) * 1000;
+        const scale = maxVal > 0 ? maxVal * 1.25 : 300;
+        return (
+          <div style={{ marginBottom: 16 }}>
+            <span style={sec}>Electricity Tariff</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {[
+                ['Residential', tariffData.res],
+                ['Industrial',  tariffData.ind],
+                ...(avg != null ? [['Average', avg]] : []),
+              ].map(([label, val]) => (
+                val != null ? (
+                  <div key={label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <span style={{ fontSize: '0.6rem', color: t.lblRow }}>{label}</span>
+                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#74C0FC' }}>
+                        ${Math.round(val * 1000)} USD/MWh
+                      </span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 2, backgroundColor: 'rgba(128,160,192,0.1)', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${Math.min(100, (val * 1000 / scale) * 100)}%`,
+                        height: '100%',
+                        backgroundColor: label === 'Average' ? '#4DABF7' : '#74C0FC',
+                        opacity: 0.8, borderRadius: 2,
+                      }} />
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: t.lbl }}>
-                    ${Math.round(val * 1000)}
-                  </div>
-                  <div style={{ fontSize: '0.44rem', color: t.lblMuted }}>USD/MWh</div>
-                </div>
-              ) : null
-            ))}
+                ) : null
+              ))}
+            </div>
+            <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic' }}>
+              {tariffs.year} · {tariffs.source}
+            </p>
           </div>
-          <p style={{ fontSize: '0.5rem', color: t.lblMuted, marginTop: 5, fontStyle: 'italic' }}>
-            {tariffs.year} · {tariffs.source}
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Electricity access ───────────────── */}
       {accessData && (
