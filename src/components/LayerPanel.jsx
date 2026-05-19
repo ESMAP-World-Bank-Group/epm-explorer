@@ -79,6 +79,7 @@ export default function LayerPanel({
   minMw, circleScale,
   plantSource, gppdAvailable, gemAvailable,
   presentFuels,
+  basemap, onBasemap,
   onToggleFuel, onToggleStatus,
   onToggleKv, onToggleLines, onTogglePlants, onToggleSubs,
   onMinMwChange, onCircleScaleChange, onSourceChange,
@@ -127,6 +128,34 @@ export default function LayerPanel({
       borderRight: `1px solid ${t.panelBorder}`,
       flexShrink: 0,
     }}>
+
+      {/* ── BASEMAP ───────────────────────────────── */}
+      {onBasemap && (
+        <div style={{ marginBottom: 14 }}>
+          <span style={{ ...sec, display: 'block', marginBottom: 6 }}>Basemap</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[
+              { id: 'minimal',   label: 'Minimal' },
+              { id: 'labeled',   label: 'Labeled' },
+              { id: 'satellite', label: 'Satellite' },
+            ].map(({ id, label }) => {
+              const active = (basemap || 'minimal') === id;
+              return (
+                <button key={id} onClick={() => onBasemap(id)} style={{
+                  flex: 1, fontSize: '0.5rem', padding: '3px 0',
+                  borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit',
+                  letterSpacing: '0.5px', border: `1px solid ${active ? 'rgba(74,143,204,0.6)' : t.panelBorder}`,
+                  backgroundColor: active ? 'rgba(74,143,204,0.12)' : 'transparent',
+                  color: active ? t.lbl : t.lblMuted,
+                  transition: 'all 0.15s',
+                }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── POWER PLANTS ──────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>

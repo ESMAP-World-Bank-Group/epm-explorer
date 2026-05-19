@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
-import { getT, mapStyle, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
+import { getT, mapStyle, swapBasemap, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CountryOverview from '../components/CountryOverview';
 import REResourcesTab from '../components/tabs/REResourcesTab';
@@ -82,6 +82,7 @@ export default function CountryPage() {
   const [filteredLinesData,  setFilteredLinesData]  = useState(null);
   const [countryCenter,      setCountryCenter]      = useState(null);
   const [activeTab,          setActiveTab]          = useState('overview');
+  const [basemap,            setBasemap]            = useState('minimal');
   const countryFeatureRef  = useRef(null);
 
   // Static data — fetch once
@@ -303,6 +304,13 @@ export default function CountryPage() {
     return () => { popup.remove(); mapRef.current?.remove(); };
   }, [info, theme]);
 
+  // ── Basemap switcher ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    swapBasemap(map, basemap, theme);
+  }, [basemap, theme]);
+
   // ── Layer toggle handlers ────────────────────────────────────────────────
 
   const toggleFuel = useCallback(fuel => {
@@ -481,6 +489,7 @@ export default function CountryPage() {
         minMw={minMw} circleScale={circleScale}
         plantSource={plantSource} gppdAvailable={gppdAvailable}
         presentFuels={presentFuels}
+        basemap={basemap} onBasemap={setBasemap}
         onToggleFuel={toggleFuel} onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
         onToggleSubs={toggleSubs}

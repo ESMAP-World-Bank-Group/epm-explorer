@@ -69,6 +69,35 @@ export function mapStyle(theme) {
   };
 }
 
+export function swapBasemap(map, basemap, theme) {
+  if (!map || !map.getLayer('land')) return;
+  if (map.getLayer('basemap-raster')) map.removeLayer('basemap-raster');
+  if (map.getSource('basemap-tiles'))  map.removeSource('basemap-tiles');
+
+  if (basemap === 'labeled') {
+    const variant = theme === 'dark' ? 'dark_all' : 'light_all';
+    map.addSource('basemap-tiles', {
+      type: 'raster',
+      tiles: ['a','b','c','d'].map(s => `https://${s}.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}@2x.png`),
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    });
+    map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-tiles' }, 'land');
+  } else if (basemap === 'satellite') {
+    map.addSource('basemap-tiles', {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      attribution: 'Tiles © Esri — Source: Esri, Maxar, GeoEye, Earthstar Geographics',
+    });
+    map.addLayer({ id: 'basemap-raster', type: 'raster', source: 'basemap-tiles' }, 'land');
+  }
+
+  map.setPaintProperty('land', 'fill-opacity', basemap === 'minimal' ? 1 : 0);
+  if (map.getLayer('borders'))
+    map.setPaintProperty('borders', 'line-opacity', basemap === 'satellite' ? 0.45 : 1);
+}
+
 export const PLANT_STATUSES = ['operating', 'construction', 'planned'];
 
 /** MapLibre match expression: feature fuel property → hex color */
