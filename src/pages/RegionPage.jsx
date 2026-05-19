@@ -85,6 +85,7 @@ export default function RegionPage() {
   const [satLabels,       setSatLabels]       = useState(false);
   const [mapMode,         setMapMode]         = useState('countries');
   const [zonesAvailable,  setZonesAvailable]  = useState(false);
+  const [refineMode,      setRefineMode]      = useState(false);
 
   // Static data
   useEffect(() => {
@@ -106,7 +107,7 @@ export default function RegionPage() {
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
 
-    setMapMode('countries'); setZonesAvailable(false);
+    setMapMode('countries'); setZonesAvailable(false); setRefineMode(false);
     fetch(`/data/zones/${regionId}_preferred_zones.geojson`, { method: 'HEAD' })
       .then(r => setZonesAvailable(r.ok)).catch(() => {});
 
@@ -209,17 +210,23 @@ export default function RegionPage() {
 
 
       // Preferred zones overlay (hidden until mapMode === 'zones')
-      map.addSource('region-zones', {
-        type: 'geojson', data: { type: 'FeatureCollection', features: [] },
-      });
-      map.addLayer({ id: 'region-zones-fill', type: 'fill', source: 'region-zones',
-        layout: { visibility: 'none' },
-        paint: { 'fill-color': zoneColorExpr(), 'fill-opacity': 0.35 },
-      });
+      // Two sources: default tolerance (simplified) and tolerance:0 (full detail / refine mode)
+      const emptyGJ = { type: 'FeatureCollection', features: [] };
+      map.addSource('region-zones',    { type: 'geojson', data: emptyGJ });
+      map.addSource('region-zones-hd', { type: 'geojson', data: emptyGJ, tolerance: 0 });
+
+      const zoneLayerPaint = {
+        fill:   { 'fill-color': zoneColorExpr(), 'fill-opacity': 0.35 },
+        border: { 'line-color': tv.isDark ? '#bbb' : '#444', 'line-width': 1.2, 'line-opacity': 0.7 },
+      };
+      map.addLayer({ id: 'region-zones-fill',   type: 'fill', source: 'region-zones',
+        layout: { visibility: 'none' }, paint: zoneLayerPaint.fill });
       map.addLayer({ id: 'region-zones-border', type: 'line', source: 'region-zones',
-        layout: { visibility: 'none' },
-        paint: { 'line-color': tv.isDark ? '#bbb' : '#444', 'line-width': 1.2, 'line-opacity': 0.7 },
-      });
+        layout: { visibility: 'none' }, paint: zoneLayerPaint.border });
+      map.addLayer({ id: 'region-zones-fill-hd',   type: 'fill', source: 'region-zones-hd',
+        layout: { visibility: 'none' }, paint: zoneLayerPaint.fill });
+      map.addLayer({ id: 'region-zones-border-hd', type: 'line', source: 'region-zones-hd',
+        layout: { visibility: 'none' }, paint: zoneLayerPaint.border });
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
       const fuels = new Set();
@@ -363,13 +370,17 @@ export default function RegionPage() {
         const canonIso = (!isos.includes(iso) && ALIAS_TO_CANON[iso]) || iso;
         if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
       });
-      map.on('click', 'region-zones-fill', e => {
+      const onZoneClick = e => {
         const iso = e.features[0].properties.ISO_A3 || e.features[0].properties.country;
         const canonIso = (!isos.includes(iso) && ALIAS_TO_CANON[iso]) || iso;
         if (isos.includes(canonIso)) navigate(`/country/${canonIso}`);
-      });
-      map.on('mouseenter', 'region-zones-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'region-zones-fill', () => { map.getCanvas().style.cursor = ''; });
+      };
+      map.on('click', 'region-zones-fill',    onZoneClick);
+      map.on('click', 'region-zones-fill-hd', onZoneClick);
+      map.on('mouseenter', 'region-zones-fill',    () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'region-zones-fill',    () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'region-zones-fill-hd', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'region-zones-fill-hd', () => { map.getCanvas().style.cursor = ''; });
 
     });
 
@@ -399,21 +410,40 @@ export default function RegionPage() {
       fetch(`/data/zones/${regionId}_preferred_zones.geojson`)
         .then(r => r.json())
         .then(data => {
-          if (!mapRef.current?.getSource('region-zones')) return;
-          mapRef.current.getSource('region-zones').setData(data);
-          for (const id of ['region-zones-fill', 'region-zones-border'])
-            mapRef.current.setLayoutProperty(id, 'visibility', 'visible');
-          mapRef.current.setLayoutProperty('region-fill', 'visibility', 'none');
+          const m = mapRef.current;
+          if (!m?.getSource('region-zones')) return;
+          m.getSource('region-zones').setData(data);
+          m.getSource('region-zones-hd').setData(data);
+          const showNormal = ['region-zones-fill', 'region-zones-border'];
+          const showHD     = ['region-zones-fill-hd', 'region-zones-border-hd'];
+          const [show, hide] = refineMode ? [showHD, showNormal] : [showNormal, showHD];
+          for (const id of show) m.setLayoutProperty(id, 'visibility', 'visible');
+          for (const id of hide) m.setLayoutProperty(id, 'visibility', 'none');
+          m.setLayoutProperty('region-fill', 'visibility', 'none');
         })
         .catch(() => setMapMode('countries'));
     } else {
-      for (const id of ['region-zones-fill', 'region-zones-border'])
+      const allZoneLayers = ['region-zones-fill', 'region-zones-border',
+                             'region-zones-fill-hd', 'region-zones-border-hd'];
+      for (const id of allZoneLayers)
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
       if (map.getLayer('region-fill')) map.setLayoutProperty('region-fill', 'visibility', 'visible');
-      if (map.getSource('region-zones'))
-        map.getSource('region-zones').setData({ type: 'FeatureCollection', features: [] });
+      const empty = { type: 'FeatureCollection', features: [] };
+      if (map.getSource('region-zones'))    map.getSource('region-zones').setData(empty);
+      if (map.getSource('region-zones-hd')) map.getSource('region-zones-hd').setData(empty);
     }
   }, [mapMode, regionId]);
+
+  // ── Refine mode toggle (swap layer visibility when zones are active) ──────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer('region-zones-fill') || mapMode !== 'zones') return;
+    const showNormal = ['region-zones-fill', 'region-zones-border'];
+    const showHD     = ['region-zones-fill-hd', 'region-zones-border-hd'];
+    const [show, hide] = refineMode ? [showHD, showNormal] : [showNormal, showHD];
+    for (const id of show) map.setLayoutProperty(id, 'visibility', 'visible');
+    for (const id of hide) map.setLayoutProperty(id, 'visibility', 'none');
+  }, [refineMode, mapMode]);
 
   // ── Layer toggle handlers ─────────────────────────────────────────────────
 
@@ -673,27 +703,50 @@ export default function RegionPage() {
         <div ref={containerRef}
           style={{ width: '100%', height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
         {zonesAvailable && (
-          <button
-            onClick={() => setMapMode(m => m === 'zones' ? 'countries' : 'zones')}
-            style={{
-              position: 'absolute', top: 10, left: 10, zIndex: 10,
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: '0.58rem', letterSpacing: '0.5px', fontFamily: 'inherit',
-              padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
-              border: `1px solid ${mapMode === 'zones' ? 'rgba(74,143,204,0.6)' : t.panelBorder}`,
-              backgroundColor: mapMode === 'zones' ? 'rgba(74,143,204,0.14)' : t.panel,
-              color: mapMode === 'zones' ? t.lbl : t.lblMuted,
-              fontWeight: mapMode === 'zones' ? 700 : 400,
-              boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-              transition: 'all 0.15s',
-            }}>
-            <span style={{
-              width: 8, height: 8, borderRadius: 2,
-              backgroundColor: mapMode === 'zones' ? 'rgba(74,143,204,0.8)' : t.panelBorder,
-              display: 'inline-block', transition: 'background 0.15s',
-            }} />
-            Recommended Zoning
-          </button>
+          <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => setMapMode(m => m === 'zones' ? 'countries' : 'zones')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: '0.58rem', letterSpacing: '0.5px', fontFamily: 'inherit',
+                padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                border: `1px solid ${mapMode === 'zones' ? 'rgba(74,143,204,0.6)' : t.panelBorder}`,
+                backgroundColor: mapMode === 'zones' ? 'rgba(74,143,204,0.14)' : t.panel,
+                color: mapMode === 'zones' ? t.lbl : t.lblMuted,
+                fontWeight: mapMode === 'zones' ? 700 : 400,
+                boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+                transition: 'all 0.15s',
+              }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: 2,
+                backgroundColor: mapMode === 'zones' ? 'rgba(74,143,204,0.8)' : t.panelBorder,
+                display: 'inline-block', transition: 'background 0.15s',
+              }} />
+              Recommended Zoning
+            </button>
+            {mapMode === 'zones' && (
+              <button
+                onClick={() => setRefineMode(r => !r)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: '0.58rem', letterSpacing: '0.5px', fontFamily: 'inherit',
+                  padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                  border: `1px solid ${refineMode ? 'rgba(144,190,109,0.6)' : t.panelBorder}`,
+                  backgroundColor: refineMode ? 'rgba(144,190,109,0.14)' : t.panel,
+                  color: refineMode ? t.lbl : t.lblMuted,
+                  fontWeight: refineMode ? 700 : 400,
+                  boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+                  transition: 'all 0.15s',
+                }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: 2,
+                  backgroundColor: refineMode ? 'rgba(144,190,109,0.8)' : t.panelBorder,
+                  display: 'inline-block', transition: 'background 0.15s',
+                }} />
+                Refine
+              </button>
+            )}
+          </div>
         )}
       </div>
 
