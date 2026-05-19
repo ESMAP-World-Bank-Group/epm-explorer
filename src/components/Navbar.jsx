@@ -175,9 +175,9 @@ export default function Navbar() {
           Data Sources
         </Link>
 
-        {/* Contact */}
+        {/* About */}
         <Link to="/contact" style={navBtn(location.pathname === '/contact')}>
-          Contact
+          About
         </Link>
 
       </div>
