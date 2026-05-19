@@ -76,12 +76,14 @@ export default function LayerPanel({
   theme,
   fuelsOff, statusOff, kvsOff,
   linesOn, plantsOn, subsOn,
+  loadCentersOn, lcMinPop, lcCircleScale,
   minMw, circleScale,
   plantSource, gppdAvailable, gemAvailable,
   presentFuels,
   basemap, onBasemap, satLabels, onSatLabels,
   onToggleFuel, onToggleStatus,
   onToggleKv, onToggleLines, onTogglePlants, onToggleSubs,
+  onToggleLoadCenters, onLcMinPopChange, onLcCircleScaleChange,
   onMinMwChange, onCircleScaleChange, onSourceChange,
   onDownloadPlants, onDownloadLines,
 }) {
@@ -347,6 +349,51 @@ export default function LayerPanel({
           }} />
           <span style={{ fontSize: '0.62rem', color: t.lblRow }}>Substations</span>
         </div>
+      )}
+
+      {/* ── LOAD CENTERS ──────────────────────────── */}
+      {onToggleLoadCenters && (
+        <>
+          <hr style={{ borderColor: 'rgba(128,160,192,0.18)', margin: '10px 0 6px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span className="layer-row" onClick={onToggleLoadCenters}
+              style={{ opacity: loadCentersOn ? 1 : 0.35, cursor: 'pointer' }}>
+              <span style={{
+                display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                backgroundColor: '#1a237e', marginRight: 6, flexShrink: 0, opacity: 0.75,
+              }} />
+              <span style={sec}>Load Centers</span>
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 2, opacity: loadCentersOn ? 1 : 0.4 }}>
+            {[[100_000, '100k+'], [300_000, '300k+'], [1_000_000, '1M+']].map(([v, label]) => {
+              const active = lcMinPop === v;
+              return (
+                <button key={v} onClick={() => onLcMinPopChange(v)} style={{
+                  flex: 1, fontSize: '0.44rem', letterSpacing: '0.5px',
+                  fontFamily: 'inherit', padding: '2px 0', borderRadius: 3,
+                  cursor: 'pointer',
+                  border: `1px solid ${active ? 'rgba(26,35,126,0.5)' : 'rgba(128,160,192,0.18)'}`,
+                  backgroundColor: active ? 'rgba(26,35,126,0.1)' : 'transparent',
+                  color: active ? t.lbl : t.lblMuted,
+                }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {onLcCircleScaleChange && lcCircleScale != null && (
+            <div style={{ marginTop: 5, opacity: loadCentersOn ? 1 : 0.4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ fontSize: '0.57rem', color: t.lblMuted }}>size</span>
+                <span style={{ fontSize: '0.57rem', color: t.lblMuted }}>{lcCircleScale.toFixed(1)}×</span>
+              </div>
+              <input type="range" min={0.4} max={2.5} step={0.1}
+                value={lcCircleScale} style={sliderStyle}
+                onChange={e => onLcCircleScaleChange(parseFloat(e.target.value))} />
+            </div>
+          )}
+        </>
       )}
 
     </div>

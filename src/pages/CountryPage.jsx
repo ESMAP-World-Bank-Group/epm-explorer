@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
-import { getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr } from '../constants';
+import { getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT, plantRadiusExpr, lcRadiusExpr } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CountryOverview from '../components/CountryOverview';
 import REResourcesTab from '../components/tabs/REResourcesTab';
@@ -69,7 +69,7 @@ export default function CountryPage() {
   const [kvsOff,       setKvsOff]       = useState(new Set());
   const [linesOn,      setLinesOn]      = useState(true);
   const [plantsOn,     setPlantsOn]     = useState(true);
-  const [subsOn,       setSubsOn]       = useState(true);
+  const [subsOn,       setSubsOn]       = useState(false);
   const [minMw,        setMinMw]        = useState(100);
   const [circleScale,  setCircleScale]  = useState(1.0);
   const [plantSource,        setPlantSource]        = useState('osm');
@@ -84,12 +84,20 @@ export default function CountryPage() {
   const [activeTab,          setActiveTab]          = useState('overview');
   const [basemap,            setBasemap]            = useState('minimal');
   const [satLabels,          setSatLabels]          = useState(false);
+  const [loadCentersOn,      setLoadCentersOn]      = useState(true);
+  const [lcMinPop,           setLcMinPop]           = useState(300_000);
+  const [lcCircleScale,      setLcCircleScale]      = useState(1.0);
+  const [zoneMode,           setZoneMode]           = useState('admin');
+  const [nZones,             setNZones]             = useState(null);
+  const [zonesIndex,         setZonesIndex]         = useState(null);
+  const mapReadyRef        = useRef(false);
   const countryFeatureRef  = useRef(null);
 
   // Static data — fetch once
   useEffect(() => {
     fetch('/data/tariffs.json').then(r => r.json()).then(setTariffs).catch(() => {});
     fetch('/data/access.json').then(r => r.json()).then(setAccess).catch(() => {});
+    fetch('/data/zones/index.json').then(r => r.json()).then(setZonesIndex).catch(() => setZonesIndex({}));
   }, []);
 
   useEffect(() => {
@@ -107,8 +115,11 @@ export default function CountryPage() {
       }
     });
     setFuelsOff(new Set()); setKvsOff(new Set());
-    setLinesOn(true); setPlantsOn(true); setSubsOn(true); setMinMw(100); setCircleScale(1.0);
+    setLinesOn(true); setPlantsOn(true); setSubsOn(false); setMinMw(100); setCircleScale(1.0);
+    setLcCircleScale(1.0);
     setPlantSource('osm'); setGppdAvailable(null); setCountryCenter(null);
+    setZoneMode('admin'); setNZones(null);
+    mapReadyRef.current = false;
     countryFeatureRef.current = null;
   }, [iso]);
 
@@ -131,11 +142,13 @@ export default function CountryPage() {
     });
 
     map.on('load', async () => {
-      const [countries, plantsGJ, linesGJ, subsGJ] = await Promise.all([
-        fetch('/data/countries_110m.geojson').then(r => r.json()),
+      const [countries, plantsGJ, linesGJ, subsGJ, lcGJ, admin1GJ] = await Promise.all([
+        fetch('/data/countries_10m.geojson').then(r => r.json()),
         fetch(`/data/cache/region_plants_${region.id}.geojson`).then(r => r.json()),
         fetch(`/data/cache/region_lines_${region.id}.geojson`).then(r => r.json()),
         fetch(`/data/cache/region_substations_${region.id}.geojson`).then(r => r.json()).catch(() => ({ type: 'FeatureCollection', features: [] })),
+        fetch(`/data/region_load_centers_${region.id}.geojson`).then(r => r.json()).catch(() => ({ type: 'FeatureCollection', features: [] })),
+        fetch(`/data/cache/region_admin1_${region.id}.geojson`).then(r => r.ok ? r.json() : { type: 'FeatureCollection', features: [] }).catch(() => ({ type: 'FeatureCollection', features: [] })),
       ]);
 
       countries.features.forEach((f, i) => {
@@ -187,10 +200,20 @@ export default function CountryPage() {
       setFilteredPlantsData(filteredPlants);
       setFilteredLinesData(filteredLines);
 
-      map.addSource('countries',   { type: 'geojson', data: countries, generateId: false });
-      map.addSource('plants',      { type: 'geojson', data: filteredPlants });
-      map.addSource('lines',       { type: 'geojson', data: filteredLines  });
-      map.addSource('substations', { type: 'geojson', data: filteredSubs   });
+      const filteredLc = {
+        ...lcGJ,
+        features: lcGJ.features.filter(f => f.properties.iso === iso),
+      };
+
+      map.addSource('countries',    { type: 'geojson', data: countries,    generateId: false });
+      map.addSource('plants',       { type: 'geojson', data: filteredPlants });
+      map.addSource('lines',        { type: 'geojson', data: filteredLines  });
+      map.addSource('substations',  { type: 'geojson', data: filteredSubs   });
+      map.addSource('load-centers', { type: 'geojson', data: filteredLc     });
+      map.addSource('admin1',       { type: 'geojson', data: admin1GJ       });
+      const hlFilter = ['==', ['get', 'ISO_A3'], iso];
+      map.addSource('zone-fills',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-lines',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
       const tv = getT(theme);
 
@@ -219,23 +242,36 @@ export default function CountryPage() {
         });
       }
 
-      // Country highlight
+      // Country highlight — light fill + border on current country
       const hl = HIGHLIGHT[theme] || HIGHLIGHT.dark;
       map.addLayer({
         id: 'country-fill',
         type: 'fill',
         source: 'countries',
-        filter: ['==', ['get', 'ISO_A3'], iso],
-        paint: { 'fill-color': hl.fill, 'fill-opacity': 1.0 },
+        filter: hlFilter,
+        paint: { 'fill-color': hl.fill, 'fill-opacity': 0.35 },
       });
       map.addLayer({
         id: 'country-border',
         type: 'line',
         source: 'countries',
-        filter: ['==', ['get', 'ISO_A3'], iso],
+        filter: hlFilter,
         paint: { 'line-color': hl.border, 'line-width': hl.borderW + 0.4, 'line-opacity': 0.95 },
       });
 
+      // Admin-1 province/state boundaries (shown in 'admin' zone mode)
+      map.addLayer({
+        id: 'admin1-fills', type: 'fill', source: 'admin1',
+        filter: ['==', ['get', 'ISO_A3'], iso],
+        layout: { visibility: 'visible' },
+        paint: { 'fill-color': '#7799bb', 'fill-opacity': 0.06 },
+      });
+      map.addLayer({
+        id: 'admin1-borders', type: 'line', source: 'admin1',
+        filter: ['==', ['get', 'ISO_A3'], iso],
+        layout: { visibility: 'visible' },
+        paint: { 'line-color': '#5577aa', 'line-width': 0.7, 'line-opacity': 0.35 },
+      });
 
       // Plants
       const fuels = new Set();
@@ -288,7 +324,7 @@ export default function CountryPage() {
       map.addImage('sub-sq', { width: sqSz, height: sqSz, data: sqData });
       map.addLayer({
         id: 'substations', type: 'symbol', source: 'substations',
-        layout: { 'icon-image': 'sub-sq', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+        layout: { 'icon-image': 'sub-sq', 'icon-allow-overlap': true, 'icon-ignore-placement': true, visibility: 'none' },
         paint: { 'icon-opacity': 0.8 },
       });
       map.on('mouseenter', 'substations', e => {
@@ -300,9 +336,81 @@ export default function CountryPage() {
       });
       map.on('mouseleave', 'substations', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
 
+      // ── Zone overlay (fill + border + labels + interzone lines) ──────────────
+      map.addLayer({
+        id: 'zone-fills', type: 'fill', source: 'zone-fills',
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.22 },
+      });
+      map.addLayer({
+        id: 'zone-borders', type: 'line', source: 'zone-fills',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#333', 'line-width': 1.8, 'line-opacity': 0.7 },
+      });
+      map.addLayer({
+        id: 'zone-labels', type: 'symbol', source: 'zone-fills',
+        layout: {
+          visibility: 'none',
+          'text-field': ['get', 'zone_name'],
+          'text-size': 11,
+          'text-anchor': 'center',
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#111',
+          'text-halo-color': 'rgba(255,255,255,0.9)',
+          'text-halo-width': 2,
+        },
+      });
+      map.addLayer({
+        id: 'zone-links', type: 'line', source: 'zone-lines',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#444', 'line-width': 2.5, 'line-opacity': 0.6, 'line-dasharray': [5, 4] },
+      });
+
+      // ── Load centers ─────────────────────────────────────────────────────────
+      map.addLayer({
+        id: 'load-centers', type: 'circle', source: 'load-centers',
+        filter: ['>=', ['get', 'pop'], 300_000],
+        paint: {
+          'circle-radius': lcRadiusExpr(),
+          'circle-color': '#1a237e',
+          'circle-opacity': 0.72,
+          'circle-stroke-width': 1.2,
+          'circle-stroke-color': 'rgba(255,255,255,0.65)',
+        },
+      });
+      map.addLayer({
+        id: 'load-centers-labels', type: 'symbol', source: 'load-centers',
+        filter: ['>=', ['get', 'pop'], 300_000],
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-size': 9,
+          'text-offset': [0, 1.3],
+          'text-anchor': 'top',
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#1a237e',
+          'text-halo-color': 'rgba(255,255,255,0.88)',
+          'text-halo-width': 1.5,
+        },
+      });
+      map.on('mouseenter', 'load-centers', e => {
+        map.getCanvas().style.cursor = 'pointer';
+        const p = e.features[0].properties;
+        const pop = p.pop >= 1_000_000
+          ? `${(p.pop / 1_000_000).toFixed(1)}M`
+          : `${Math.round(p.pop / 1_000)}k`;
+        popup.setLngLat(e.features[0].geometry.coordinates).setHTML(`<b>${p.name}</b><br><span style="opacity:.75">${pop} pop.</span>`).addTo(map);
+      });
+      map.on('mouseleave', 'load-centers', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
+
+      mapReadyRef.current = true;
+
     });
 
-    return () => { popup.remove(); mapRef.current?.remove(); };
+    return () => { mapReadyRef.current = false; popup.remove(); mapRef.current?.remove(); };
   }, [info, theme]);
 
   // ── Basemap switcher ─────────────────────────────────────────────────────
@@ -377,6 +485,27 @@ export default function CountryPage() {
     });
   }, []);
 
+  const toggleLoadCenters = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    setLoadCentersOn(prev => {
+      const next = !prev;
+      for (const id of ['load-centers', 'load-centers-labels']) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
+      }
+      return next;
+    });
+  }, []);
+
+  const handleLcMinPop = useCallback(pop => {
+    const map = mapRef.current;
+    if (!map) return;
+    setLcMinPop(pop);
+    for (const id of ['load-centers', 'load-centers-labels']) {
+      if (map.getLayer(id)) map.setFilter(id, ['>=', ['get', 'pop'], pop]);
+    }
+  }, []);
+
   const handleMinMw = useCallback(mw => {
     const map = mapRef.current;
     if (!map) return;
@@ -399,6 +528,72 @@ export default function CountryPage() {
       map.setPaintProperty(`plants-${fuel}`, 'circle-radius', plantRadiusExpr(scale));
     }
   }, []);
+
+  const handleLcCircleScale = useCallback(scale => {
+    const map = mapRef.current;
+    if (!map) return;
+    setLcCircleScale(scale);
+    if (map.getLayer('load-centers')) {
+      map.setPaintProperty('load-centers', 'circle-radius', lcRadiusExpr(scale));
+    }
+  }, []);
+
+  // ── Zone overlay ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current || !map.getSource('zone-fills')) return;
+    const ZONE_IDS  = ['zone-fills', 'zone-borders', 'zone-labels'];
+    const ADMIN_IDS = ['admin1-fills', 'admin1-borders'];
+
+    const showAdmin = zoneMode === 'admin';
+    for (const id of ADMIN_IDS) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', showAdmin ? 'visible' : 'none');
+    }
+
+    if (zoneMode !== 'modeling' || !nZones) {
+      for (const id of ZONE_IDS) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+      }
+      return;
+    }
+
+    const COLORS = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
+    const label = `${iso}_${nZones}z`;
+
+    Promise.all([
+      fetch(`/data/zones/${label}_zones.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`/data/zones/${label}_topo.json`).then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([zonesGJ, topo]) => {
+      if (!zonesGJ || !map.getSource('zone-fills')) return;
+      zonesGJ.features.forEach((f, i) => { f.properties.color = COLORS[i % COLORS.length]; });
+      map.getSource('zone-fills').setData(zonesGJ);
+
+      // Build interzone line geometries from centroids
+      const centroids = {};
+      for (const f of zonesGJ.features) {
+        const name = f.properties.zone_name;
+        const coords = f.geometry.type === 'Polygon'
+          ? f.geometry.coordinates[0]
+          : f.geometry.coordinates[0][0];
+        centroids[name] = [
+          coords.reduce((s, p) => s + p[0], 0) / coords.length,
+          coords.reduce((s, p) => s + p[1], 0) / coords.length,
+        ];
+      }
+      const lineFeatures = topo
+        .filter(l => centroids[l.z] && centroids[l.zz])
+        .map(l => ({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [centroids[l.z], centroids[l.zz]] },
+          properties: l,
+        }));
+      map.getSource('zone-lines').setData({ type: 'FeatureCollection', features: lineFeatures });
+
+      for (const id of ZONE_IDS) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+      }
+    });
+  }, [zoneMode, nZones, iso]);
 
   // ── Plant source hot-swap ─────────────────────────────────────────────────
   useEffect(() => {
@@ -501,13 +696,79 @@ export default function CountryPage() {
         onToggleFuel={toggleFuel} onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
         onToggleSubs={toggleSubs}
+        loadCentersOn={loadCentersOn} lcMinPop={lcMinPop} lcCircleScale={lcCircleScale}
+        onToggleLoadCenters={toggleLoadCenters} onLcMinPopChange={handleLcMinPop}
+        onLcCircleScaleChange={handleLcCircleScale}
         onMinMwChange={handleMinMw} onCircleScaleChange={handleCircleScale}
         onSourceChange={setPlantSource}
         onDownloadPlants={handleDownloadPlants}
         onDownloadLines={handleDownloadLines}
       />
 
-      <div ref={containerRef} style={{ flex: 1, height: 'calc(100vh - 46px)', backgroundColor: t.bg }} />
+      <div style={{ flex: 1, position: 'relative', height: 'calc(100vh - 46px)' }}>
+        <div ref={containerRef} style={{ position: 'absolute', inset: 0, backgroundColor: t.bg }} />
+
+        {/* ── Floating zone selector ── */}
+        {zonesIndex !== null && (
+          <div style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 10,
+            backgroundColor: t.panel, border: `1px solid ${t.panelBorder}`,
+            borderRadius: 6, padding: '8px 10px', minWidth: 130,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+          }}>
+            <span style={{
+              fontSize: '0.44rem', letterSpacing: '2px', fontWeight: 700,
+              color: t.lblMuted, textTransform: 'uppercase', display: 'block', marginBottom: 6,
+            }}>Zones</span>
+            <div style={{ display: 'flex', gap: 3, marginBottom: 6 }}>
+              {[['admin', 'Admin'], ['modeling', 'Clustering']].map(([mode, label]) => {
+                const active = zoneMode === mode;
+                const disabled = mode === 'modeling' && !(zonesIndex[iso]?.length);
+                return (
+                  <button key={mode} disabled={disabled}
+                    onClick={() => {
+                      setZoneMode(mode);
+                      if (mode === 'modeling' && !nZones && zonesIndex[iso]?.length) {
+                        setNZones(zonesIndex[iso][0]);
+                      }
+                    }}
+                    style={{
+                      flex: 1, fontSize: '0.5rem', padding: '3px 0',
+                      borderRadius: 3, cursor: disabled ? 'default' : 'pointer',
+                      fontFamily: 'inherit', letterSpacing: '0.5px',
+                      border: `1px solid ${active ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
+                      backgroundColor: active ? 'rgba(74,143,204,0.13)' : 'transparent',
+                      color: active ? t.lbl : t.lblMuted,
+                      opacity: disabled ? 0.4 : 1,
+                    }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {zoneMode === 'modeling' && zonesIndex[iso]?.length ? (
+              <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                {zonesIndex[iso].map(n => (
+                  <button key={n} onClick={() => setNZones(n)} style={{
+                    fontSize: '0.48rem', padding: '2px 6px',
+                    borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit',
+                    border: `1px solid ${nZones === n ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
+                    backgroundColor: nZones === n ? 'rgba(74,143,204,0.13)' : 'transparent',
+                    color: nZones === n ? t.lbl : t.lblMuted,
+                  }}>
+                    {n}z
+                  </button>
+                ))}
+              </div>
+            ) : zoneMode === 'modeling' ? (
+              <p style={{ fontSize: '0.48rem', color: t.lblMuted, fontStyle: 'italic', margin: 0 }}>
+                No zone data — run pipeline
+              </p>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       {/* Right panel */}
       <div style={{
@@ -545,9 +806,9 @@ export default function CountryPage() {
           <div style={{ display: 'flex', gap: 3, marginBottom: 0 }}>
             {[
               { id: 'overview', label: 'Overview' },
+              { id: 'zoning',   label: 'Zones' },
               { id: 're',       label: 'RE' },
               { id: 'load',     label: 'Load' },
-              { id: 'zoning',   label: 'Zones' },
             ].map(({ id, label }) => {
               const active = activeTab === id;
               return (
@@ -630,7 +891,7 @@ export default function CountryPage() {
           )}
 
           {activeTab === 'zoning' && (
-            <ZoningTab iso={iso} theme={theme} />
+            <ZoningTab iso={iso} theme={theme} regionId={region.id} />
           )}
 
           <div style={{ borderTop: `1px solid ${t.hr}`, paddingTop: 12, marginTop: 20 }}>

@@ -4,7 +4,7 @@ import maplibregl from 'maplibre-gl';
 import { useTheme } from '../App';
 import {
   getT, mapStyle, swapBasemap, toggleSatLabels, FUEL_COLORS, VOLTAGE_BRACKETS, HIGHLIGHT,
-  plantRadiusExpr, fuelColorExpr, PLANT_STATUSES,
+  plantRadiusExpr, lcRadiusExpr, fuelColorExpr, PLANT_STATUSES,
 } from '../constants';
 import LayerPanel from '../components/LayerPanel';
 import CapacityChart from '../components/CapacityChart';
@@ -73,13 +73,16 @@ export default function RegionPage() {
   const [kvsOff,        setKvsOff]        = useState(new Set());
   const [linesOn,       setLinesOn]       = useState(true);
   const [plantsOn,      setPlantsOn]      = useState(true);
-  const [subsOn,        setSubsOn]        = useState(true);
-  const [minMw,         setMinMw]         = useState(100);
-  const [circleScale,   setCircleScale]   = useState(1.0);
-  const [plantSource,   setPlantSource]   = useState('osm');
-  const [activeTab,     setActiveTab]     = useState('overview');
-  const [basemap,       setBasemap]       = useState('minimal');
-  const [satLabels,     setSatLabels]     = useState(false);
+  const [subsOn,          setSubsOn]          = useState(false);
+  const [loadCentersOn,   setLoadCentersOn]   = useState(false);
+  const [lcMinPop,        setLcMinPop]        = useState(300_000);
+  const [lcCircleScale,   setLcCircleScale]   = useState(1.0);
+  const [minMw,           setMinMw]           = useState(100);
+  const [circleScale,     setCircleScale]     = useState(1.0);
+  const [plantSource,     setPlantSource]     = useState('osm');
+  const [activeTab,       setActiveTab]       = useState('overview');
+  const [basemap,         setBasemap]         = useState('minimal');
+  const [satLabels,       setSatLabels]       = useState(false);
 
   // Static data
   useEffect(() => {
@@ -96,7 +99,8 @@ export default function RegionPage() {
     setCapacity(null); setFleetAge(null);
     fetch(`/data/cache/region_capacity_${regionId}.json`).then(r => r.json()).then(setCapacity).catch(() => {});
     setFuelsOff(new Set()); setStatusOff(new Set()); setKvsOff(new Set());
-    setLinesOn(true); setPlantsOn(true); setSubsOn(true);
+    setLinesOn(true); setPlantsOn(true); setSubsOn(false);
+    setLoadCentersOn(false); setLcMinPop(300_000); setLcCircleScale(1.0);
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
 
@@ -139,11 +143,13 @@ export default function RegionPage() {
     });
 
     map.on('load', async () => {
-      const [countries, plantsGJ, linesGJ, subsGJ] = await Promise.all([
+      const [countries, plantsGJ, linesGJ, subsGJ, lcGJ] = await Promise.all([
         fetch('/data/countries_110m.geojson').then(r => r.json()),
         fetch(`/data/cache/region_plants_${regionId}.geojson`).then(r => r.json()),
         fetch(`/data/cache/region_lines_${regionId}.geojson`).then(r => r.json()),
         fetch(`/data/cache/region_substations_${regionId}.geojson`)
+          .then(r => r.json()).catch(() => ({ type: 'FeatureCollection', features: [] })),
+        fetch(`/data/region_load_centers_${regionId}.geojson`)
           .then(r => r.json()).catch(() => ({ type: 'FeatureCollection', features: [] })),
       ]);
 
@@ -158,10 +164,11 @@ export default function RegionPage() {
       const bounds = fitBounds(expandedIsos, countries);
       if (bounds) map.fitBounds(bounds, { padding: 40, duration: 0 });
 
-      map.addSource('countries',   { type: 'geojson', data: countries, generateId: false });
-      map.addSource('plants',      { type: 'geojson', data: plantsGJ });
-      map.addSource('lines',       { type: 'geojson', data: linesGJ  });
-      map.addSource('substations', { type: 'geojson', data: subsGJ   });
+      map.addSource('countries',    { type: 'geojson', data: countries, generateId: false });
+      map.addSource('plants',       { type: 'geojson', data: plantsGJ });
+      map.addSource('lines',        { type: 'geojson', data: linesGJ  });
+      map.addSource('substations',  { type: 'geojson', data: subsGJ   });
+      map.addSource('load-centers', { type: 'geojson', data: lcGJ     });
 
       const tv = getT(theme);
       map.addLayer({ id: 'land',    type: 'fill', source: 'countries',
@@ -270,7 +277,8 @@ export default function RegionPage() {
       }
       map.addImage('sub-sq', { width: sqSz, height: sqSz, data: sqData });
       map.addLayer({ id: 'substations', type: 'symbol', source: 'substations',
-        layout: { 'icon-image': 'sub-sq', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+        filter: ['in', ['get', 'iso'], ['literal', isos]],
+        layout: { 'icon-image': 'sub-sq', 'icon-allow-overlap': true, 'icon-ignore-placement': true, visibility: 'none' },
         paint: { 'icon-opacity': 0.8 } });
       map.on('mouseenter', 'substations', e => {
         map.getCanvas().style.cursor = 'pointer';
@@ -281,6 +289,39 @@ export default function RegionPage() {
           .addTo(map);
       });
       map.on('mouseleave', 'substations', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
+
+      // Load centers
+      map.addLayer({
+        id: 'load-centers', type: 'circle', source: 'load-centers',
+        filter: ['>=', ['get', 'pop'], 300_000],
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': lcRadiusExpr(),
+          'circle-color': '#1a237e', 'circle-opacity': 0.72,
+          'circle-stroke-width': 1.2, 'circle-stroke-color': 'rgba(255,255,255,0.65)',
+        },
+      });
+      map.addLayer({
+        id: 'load-centers-labels', type: 'symbol', source: 'load-centers',
+        filter: ['>=', ['get', 'pop'], 300_000],
+        layout: {
+          visibility: 'none',
+          'text-field': ['get', 'name'], 'text-size': 9,
+          'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#1a237e',
+          'text-halo-color': 'rgba(255,255,255,0.88)', 'text-halo-width': 1.5,
+        },
+      });
+      map.on('mouseenter', 'load-centers', e => {
+        map.getCanvas().style.cursor = 'pointer';
+        const p = e.features[0].properties;
+        const pop = p.pop >= 1_000_000 ? `${(p.pop / 1_000_000).toFixed(1)}M` : `${Math.round(p.pop / 1_000)}k`;
+        popup.setLngLat(e.features[0].geometry.coordinates)
+          .setHTML(`<b>${p.name}</b><br><span style="opacity:.75">${pop} pop.</span>`).addTo(map);
+      });
+      map.on('mouseleave', 'load-centers', () => { map.getCanvas().style.cursor = ''; popup.remove(); });
 
       // Country hover + click
       let hoveredId = null;
@@ -417,6 +458,33 @@ export default function RegionPage() {
         map.setPaintProperty(`plants-${s}`, 'circle-radius', plantRadiusExpr(scale));
   }, []);
 
+  const toggleLoadCenters = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    setLoadCentersOn(prev => {
+      const next = !prev;
+      for (const id of ['load-centers', 'load-centers-labels'])
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
+      return next;
+    });
+  }, []);
+
+  const handleLcMinPop = useCallback(pop => {
+    const map = mapRef.current;
+    if (!map) return;
+    setLcMinPop(pop);
+    for (const id of ['load-centers', 'load-centers-labels'])
+      if (map.getLayer(id)) map.setFilter(id, ['>=', ['get', 'pop'], pop]);
+  }, []);
+
+  const handleLcCircleScale = useCallback(scale => {
+    const map = mapRef.current;
+    if (!map) return;
+    setLcCircleScale(scale);
+    if (map.getLayer('load-centers'))
+      map.setPaintProperty('load-centers', 'circle-radius', lcRadiusExpr(scale));
+  }, []);
+
   // Plant source hot-swap
   useEffect(() => {
     const map = mapRef.current;
@@ -541,6 +609,9 @@ export default function RegionPage() {
         onToggleKv={toggleKv}
         onToggleLines={toggleLines} onTogglePlants={togglePlants}
         onToggleSubs={toggleSubs}
+        loadCentersOn={loadCentersOn} lcMinPop={lcMinPop} lcCircleScale={lcCircleScale}
+        onToggleLoadCenters={toggleLoadCenters} onLcMinPopChange={handleLcMinPop}
+        onLcCircleScaleChange={handleLcCircleScale}
         onMinMwChange={handleMinMw} onCircleScaleChange={handleCircleScale}
         onSourceChange={setPlantSource}
         onDownloadPlants={handleDownloadPlants}

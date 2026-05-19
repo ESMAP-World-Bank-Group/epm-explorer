@@ -127,11 +127,23 @@ export function fuelColorExpr() {
 export function plantRadiusExpr(scale = 1) {
   return [
     'interpolate', ['linear'], ['get', 'mw'],
-    0,    4  * scale,
-    50,   5  * scale,
-    200,  8  * scale,
-    500,  12 * scale,
-    1000, 16 * scale,
-    5000, 22 * scale,
+    0,    3.5 * scale,
+    50,   4.5 * scale,
+    200,  7   * scale,
+    500,  10  * scale,
+    1000, 13  * scale,
+    5000, 18  * scale,
+  ];
+}
+
+/** MapLibre circle-radius expression based on population, scaled by a multiplier */
+export function lcRadiusExpr(scale = 1) {
+  return [
+    'interpolate', ['linear'], ['get', 'pop'],
+    100_000,    3   * scale,
+    500_000,    5   * scale,
+    1_000_000,  7   * scale,
+    5_000_000,  11  * scale,
+    15_000_000, 16  * scale,
   ];
 }
