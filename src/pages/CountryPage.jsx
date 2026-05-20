@@ -91,6 +91,7 @@ export default function CountryPage() {
   const [nZones,             setNZones]             = useState(null);
   const [zonesIndex,         setZonesIndex]         = useState(null);
   const [zoneLabelsOn,       setZoneLabelsOn]       = useState(true);
+  const [zoneCorridorsOn,    setZoneCorridorsOn]    = useState(false);
   const mapReadyRef        = useRef(false);
   const countryFeatureRef  = useRef(null);
 
@@ -213,9 +214,10 @@ export default function CountryPage() {
       map.addSource('load-centers', { type: 'geojson', data: filteredLc     });
       map.addSource('admin1',       { type: 'geojson', data: admin1GJ       });
       const hlFilter = ['==', ['get', 'ISO_A3'], iso];
-      map.addSource('zone-fills',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addSource('zone-inner',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addSource('zone-lines',   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-fills',        { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-inner',        { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-lines',        { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-corridors-src',{ type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
       const tv = getT(theme);
 
@@ -361,6 +363,36 @@ export default function CountryPage() {
         id: 'zone-links', type: 'line', source: 'zone-lines',
         layout: { visibility: 'none' },
         paint: { 'line-color': '#444', 'line-width': 2.5, 'line-opacity': 0.6, 'line-dasharray': [5, 4] },
+      });
+
+      // Corridor capacity lines (existing = solid blue, planned = dashed amber)
+      const mwWidthExpr = ['interpolate', ['linear'], ['get', 'mw'], 0, 1.5, 500, 3.0, 2000, 6.0];
+      map.addLayer({
+        id: 'zone-corridors-ex', type: 'line', source: 'zone-corridors-src',
+        filter: ['!', ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]]],
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#1a5fa8', 'line-width': mwWidthExpr, 'line-opacity': 0.85 },
+      });
+      map.addLayer({
+        id: 'zone-corridors-pl', type: 'line', source: 'zone-corridors-src',
+        filter: ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]],
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#a06800', 'line-width': mwWidthExpr, 'line-opacity': 0.75, 'line-dasharray': [5, 4] },
+      });
+      map.addLayer({
+        id: 'zone-corridors-labels', type: 'symbol', source: 'zone-corridors-src',
+        layout: {
+          visibility: 'none',
+          'text-field': ['get', 'label'],
+          'text-size': 9,
+          'symbol-placement': 'line-center',
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#1a5fa8',
+          'text-halo-color': 'rgba(255,255,255,0.9)',
+          'text-halo-width': 1.5,
+        },
       });
 
       // Country border on top of zone layers so it always covers zone outer edges
@@ -511,6 +543,18 @@ export default function CountryPage() {
     });
   }, []);
 
+  const toggleZoneCorridors = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    setZoneCorridorsOn(prev => {
+      const next = !prev;
+      for (const id of ['zone-corridors-ex', 'zone-corridors-pl', 'zone-corridors-labels']) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
+      }
+      return next;
+    });
+  }, []);
+
   const handleLcMinPop = useCallback(pop => {
     const map = mapRef.current;
     if (!map) return;
@@ -568,6 +612,9 @@ export default function CountryPage() {
       for (const id of ZONE_IDS) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
       }
+      for (const id of ['zone-corridors-ex', 'zone-corridors-pl', 'zone-corridors-labels']) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+      }
       return;
     }
 
@@ -578,7 +625,8 @@ export default function CountryPage() {
       fetch(`/data/zones/${label}_zones.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
       fetch(`/data/zones/${label}_topo.json`).then(r => r.ok ? r.json() : []).catch(() => []),
       fetch(`/data/zones/${label}_inner.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([zonesGJ, topo, innerGJ]) => {
+      fetch(`/data/zones/${label}_corridors.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([zonesGJ, topo, innerGJ, corridorsGJ]) => {
       if (!zonesGJ || !map.getSource('zone-fills')) return;
       zonesGJ.features.forEach((f, i) => { f.properties.color = COLORS[i % COLORS.length]; });
       map.getSource('zone-fills').setData(zonesGJ);
@@ -605,13 +653,21 @@ export default function CountryPage() {
         }));
       map.getSource('zone-lines').setData({ type: 'FeatureCollection', features: lineFeatures });
 
+      // Corridor capacity overlay
+      if (corridorsGJ && map.getSource('zone-corridors-src'))
+        map.getSource('zone-corridors-src').setData(corridorsGJ);
+      for (const id of ['zone-corridors-ex', 'zone-corridors-pl', 'zone-corridors-labels']) {
+        if (map.getLayer(id))
+          map.setLayoutProperty(id, 'visibility', zoneCorridorsOn ? 'visible' : 'none');
+      }
+
       for (const id of ZONE_IDS) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       }
       if (map.getLayer('zone-labels'))
         map.setLayoutProperty('zone-labels', 'visibility', zoneLabelsOn ? 'visible' : 'none');
     });
-  }, [zoneMode, nZones, iso, zoneLabelsOn]);
+  }, [zoneMode, nZones, iso, zoneLabelsOn, zoneCorridorsOn]);
 
   // ── Plant source hot-swap ─────────────────────────────────────────────────
   useEffect(() => {
@@ -780,15 +836,24 @@ export default function CountryPage() {
                     </button>
                   ))}
                 </div>
-                <div style={{ marginTop: 5, borderTop: `1px solid ${t.panelBorder}`, paddingTop: 4 }}>
+                <div style={{ marginTop: 5, borderTop: `1px solid ${t.panelBorder}`, paddingTop: 4, display: 'flex', gap: 3 }}>
                   <button onClick={toggleZoneLabels} style={{
                     fontSize: '0.48rem', padding: '2px 6px', borderRadius: 3, cursor: 'pointer',
-                    fontFamily: 'inherit', width: '100%',
+                    fontFamily: 'inherit', flex: 1,
                     border: `1px solid ${zoneLabelsOn ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
                     backgroundColor: zoneLabelsOn ? 'rgba(74,143,204,0.13)' : 'transparent',
                     color: zoneLabelsOn ? t.lbl : t.lblMuted,
                   }}>
                     Labels
+                  </button>
+                  <button onClick={toggleZoneCorridors} style={{
+                    fontSize: '0.48rem', padding: '2px 6px', borderRadius: 3, cursor: 'pointer',
+                    fontFamily: 'inherit', flex: 1,
+                    border: `1px solid ${zoneCorridorsOn ? 'rgba(74,143,204,0.65)' : t.panelBorder}`,
+                    backgroundColor: zoneCorridorsOn ? 'rgba(74,143,204,0.13)' : 'transparent',
+                    color: zoneCorridorsOn ? t.lbl : t.lblMuted,
+                  }}>
+                    Corridors
                   </button>
                 </div>
               </>

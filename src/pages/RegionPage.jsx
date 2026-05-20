@@ -86,6 +86,7 @@ export default function RegionPage() {
   const [mapMode,         setMapMode]         = useState('countries');
   const [zonesAvailable,  setZonesAvailable]  = useState(false);
   const [refineMode,      setRefineMode]      = useState(false);
+  const [corridorsOn,     setCorridorsOn]     = useState(false);
 
   // Static data
   useEffect(() => {
@@ -107,7 +108,7 @@ export default function RegionPage() {
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
 
-    setMapMode('countries'); setZonesAvailable(false); setRefineMode(false);
+    setMapMode('countries'); setZonesAvailable(false); setRefineMode(false); setCorridorsOn(false);
     fetch(`/data/zones/${regionId}_preferred_zones.geojson`, { method: 'HEAD' })
       .then(r => setZonesAvailable(r.ok)).catch(() => {});
 
@@ -211,7 +212,8 @@ export default function RegionPage() {
 
       // Preferred zones overlay (hidden until mapMode === 'zones')
       const emptyGJ = { type: 'FeatureCollection', features: [] };
-      map.addSource('region-zones', { type: 'geojson', data: emptyGJ });
+      map.addSource('region-zones',         { type: 'geojson', data: emptyGJ });
+      map.addSource('region-corridors-src', { type: 'geojson', data: emptyGJ });
 
       const zoneLayerPaint = {
         fill:   { 'fill-color': zoneColorExpr(), 'fill-opacity': 0.35 },
@@ -221,6 +223,36 @@ export default function RegionPage() {
         layout: { visibility: 'none' }, paint: zoneLayerPaint.fill });
       map.addLayer({ id: 'region-zones-border', type: 'line', source: 'region-zones',
         layout: { visibility: 'none' }, paint: zoneLayerPaint.border });
+
+      // Corridor capacity lines for preferred zone view
+      const mwWidthExpr = ['interpolate', ['linear'], ['get', 'mw'], 0, 1.5, 500, 3.0, 2000, 6.0];
+      map.addLayer({
+        id: 'region-corridors-ex', type: 'line', source: 'region-corridors-src',
+        filter: ['!', ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]]],
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#1a5fa8', 'line-width': mwWidthExpr, 'line-opacity': 0.85 },
+      });
+      map.addLayer({
+        id: 'region-corridors-pl', type: 'line', source: 'region-corridors-src',
+        filter: ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]],
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#a06800', 'line-width': mwWidthExpr, 'line-opacity': 0.75, 'line-dasharray': [5, 4] },
+      });
+      map.addLayer({
+        id: 'region-corridors-labels', type: 'symbol', source: 'region-corridors-src',
+        layout: {
+          visibility: 'none',
+          'text-field': ['get', 'label'],
+          'text-size': 9,
+          'symbol-placement': 'line-center',
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#1a5fa8',
+          'text-halo-color': 'rgba(255,255,255,0.9)',
+          'text-halo-width': 1.5,
+        },
+      });
 
       // ── Plant layers (3 status layers, data-driven fuel color) ───────────
       const fuels = new Set();
@@ -417,15 +449,24 @@ export default function RegionPage() {
       const url = refineMode
         ? `/data/zones/${regionId}_preferred_zones_hd.geojson`
         : `/data/zones/${regionId}_preferred_zones.geojson`;
-      fetch(url)
-        .then(r => r.json())
-        .then(data => {
+      const corrUrl = `/data/zones/${regionId}_preferred_corridors.geojson`;
+      Promise.all([
+        fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+        fetch(corrUrl).then(r => r.ok ? r.json() : null).catch(() => null),
+      ])
+        .then(([data, corridorsGJ]) => {
           const m = mapRef.current;
           if (!m?.getSource('region-zones')) return;
           m.getSource('region-zones').setData(data);
           m.setLayoutProperty('region-zones-fill',   'visibility', 'visible');
           m.setLayoutProperty('region-zones-border', 'visibility', 'visible');
           m.setLayoutProperty('region-fill', 'visibility', 'none');
+          if (corridorsGJ && m.getSource('region-corridors-src'))
+            m.getSource('region-corridors-src').setData(corridorsGJ);
+          for (const id of ['region-corridors-ex', 'region-corridors-pl', 'region-corridors-labels']) {
+            if (m.getLayer(id))
+              m.setLayoutProperty(id, 'visibility', corridorsOn ? 'visible' : 'none');
+          }
         })
         .catch(() => setMapMode('countries'));
     } else {
@@ -434,8 +475,13 @@ export default function RegionPage() {
       if (map.getLayer('region-fill'))         map.setLayoutProperty('region-fill', 'visibility', 'visible');
       if (map.getSource('region-zones'))
         map.getSource('region-zones').setData({ type: 'FeatureCollection', features: [] });
+      for (const id of ['region-corridors-ex', 'region-corridors-pl', 'region-corridors-labels']) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+      }
+      if (map.getSource('region-corridors-src'))
+        map.getSource('region-corridors-src').setData({ type: 'FeatureCollection', features: [] });
     }
-  }, [mapMode, regionId, refineMode]);
+  }, [mapMode, regionId, refineMode, corridorsOn]);
 
   // ── Layer toggle handlers ─────────────────────────────────────────────────
 
@@ -529,6 +575,18 @@ export default function RegionPage() {
     for (const s of PLANT_STATUSES)
       if (map.getLayer(`plants-${s}`))
         map.setPaintProperty(`plants-${s}`, 'circle-radius', plantRadiusExpr(scale));
+  }, []);
+
+  const toggleCorridors = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    setCorridorsOn(prev => {
+      const next = !prev;
+      for (const id of ['region-corridors-ex', 'region-corridors-pl', 'region-corridors-labels']) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
+      }
+      return next;
+    });
   }, []);
 
   const toggleLoadCenters = useCallback(() => {
@@ -716,6 +774,28 @@ export default function RegionPage() {
               }} />
               Recommended Zoning
             </button>
+            {mapMode === 'zones' && (
+              <button
+                onClick={toggleCorridors}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: '0.58rem', letterSpacing: '0.5px', fontFamily: 'inherit',
+                  padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                  border: `1px solid ${corridorsOn ? 'rgba(74,143,204,0.6)' : t.panelBorder}`,
+                  backgroundColor: corridorsOn ? 'rgba(74,143,204,0.14)' : t.panel,
+                  color: corridorsOn ? t.lbl : t.lblMuted,
+                  fontWeight: corridorsOn ? 700 : 400,
+                  boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+                  transition: 'all 0.15s',
+                }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: 2,
+                  backgroundColor: corridorsOn ? 'rgba(74,143,204,0.8)' : t.panelBorder,
+                  display: 'inline-block', transition: 'background 0.15s',
+                }} />
+                Corridors
+              </button>
+            )}
             {mapMode === 'zones' && (
               <button
                 onClick={() => setRefineMode(r => !r)}
