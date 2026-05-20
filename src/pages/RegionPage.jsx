@@ -85,7 +85,6 @@ export default function RegionPage() {
   const [satLabels,       setSatLabels]       = useState(false);
   const [mapMode,         setMapMode]         = useState('countries');
   const [zonesAvailable,  setZonesAvailable]  = useState(false);
-  const [refineMode,      setRefineMode]      = useState(false);
   const [corridorsOn,     setCorridorsOn]     = useState(false);
 
   // Static data
@@ -108,7 +107,7 @@ export default function RegionPage() {
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
 
-    setMapMode('countries'); setZonesAvailable(false); setRefineMode(false); setCorridorsOn(false);
+    setMapMode('countries'); setZonesAvailable(false); setCorridorsOn(false);
     fetch(`/data/zones/${regionId}_preferred_zones.geojson`, { method: 'HEAD' })
       .then(r => setZonesAvailable(r.ok)).catch(() => {});
 
@@ -214,6 +213,7 @@ export default function RegionPage() {
       const emptyGJ = { type: 'FeatureCollection', features: [] };
       map.addSource('region-zones',         { type: 'geojson', data: emptyGJ });
       map.addSource('region-corridors-src', { type: 'geojson', data: emptyGJ });
+      map.addSource('region-centroids-src', { type: 'geojson', data: emptyGJ });
 
       const zoneLayerPaint = {
         fill:   { 'fill-color': zoneColorExpr(), 'fill-opacity': 0.35 },
@@ -233,13 +233,8 @@ export default function RegionPage() {
         paint: { 'line-color': '#1a5fa8', 'line-width': mwWidthExpr, 'line-opacity': 0.85 },
       });
       map.addLayer({
-        id: 'region-corridors-pl', type: 'line', source: 'region-corridors-src',
-        filter: ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]],
-        layout: { visibility: 'none' },
-        paint: { 'line-color': '#a06800', 'line-width': mwWidthExpr, 'line-opacity': 0.75, 'line-dasharray': [5, 4] },
-      });
-      map.addLayer({
         id: 'region-corridors-labels', type: 'symbol', source: 'region-corridors-src',
+        filter: ['!', ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]]],
         layout: {
           visibility: 'none',
           'text-field': ['get', 'label'],
@@ -251,6 +246,15 @@ export default function RegionPage() {
           'text-color': '#1a5fa8',
           'text-halo-color': 'rgba(255,255,255,0.9)',
           'text-halo-width': 1.5,
+        },
+      });
+      map.addLayer({
+        id: 'region-corridors-dots', type: 'circle', source: 'region-centroids-src',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': 4, 'circle-color': '#696969',
+          'circle-opacity': 0.75,
+          'circle-stroke-width': 1.2, 'circle-stroke-color': 'rgba(255,255,255,0.7)',
         },
       });
 
@@ -430,10 +434,8 @@ export default function RegionPage() {
     if (!map?.getLayer('region-zones-fill')) return;
     const showZones = mapMode === 'zones';
 
-    // Swap land background resolution to match zone detail
-    const landUrl = refineMode && showZones
-      ? '/data/countries_10m.geojson'
-      : '/data/countries_110m.geojson';
+    // Always use 10m land when zones are visible for crisp coastlines
+    const landUrl = showZones ? '/data/countries_10m.geojson' : '/data/countries_110m.geojson';
     fetch(landUrl).then(r => r.json()).then(data => {
       data.features.forEach((f, i) => {
         const p = f.properties;
@@ -446,9 +448,7 @@ export default function RegionPage() {
     }).catch(() => {});
 
     if (showZones) {
-      const url = refineMode
-        ? `/data/zones/${regionId}_preferred_zones_hd.geojson`
-        : `/data/zones/${regionId}_preferred_zones.geojson`;
+      const url = `/data/zones/${regionId}_preferred_zones_hd.geojson`;
       const corrUrl = `/data/zones/${regionId}_preferred_corridors.geojson`;
       Promise.all([
         fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
@@ -461,9 +461,20 @@ export default function RegionPage() {
           m.setLayoutProperty('region-zones-fill',   'visibility', 'visible');
           m.setLayoutProperty('region-zones-border', 'visibility', 'visible');
           m.setLayoutProperty('region-fill', 'visibility', 'none');
-          if (corridorsGJ && m.getSource('region-corridors-src'))
-            m.getSource('region-corridors-src').setData(corridorsGJ);
-          for (const id of ['region-corridors-ex', 'region-corridors-pl', 'region-corridors-labels']) {
+          const emptyGJ = { type: 'FeatureCollection', features: [] };
+          if (m.getSource('region-corridors-src'))
+            m.getSource('region-corridors-src').setData(corridorsGJ || emptyGJ);
+          // Extract centroids from corridor endpoints
+          const centroidMap = new Map();
+          for (const f of (corridorsGJ?.features || [])) {
+            const [s, e] = [f.geometry.coordinates[0], f.geometry.coordinates[f.geometry.coordinates.length - 1]];
+            const ks = `${s[0]},${s[1]}`, ke = `${e[0]},${e[1]}`;
+            if (!centroidMap.has(ks)) centroidMap.set(ks, { type: 'Feature', geometry: { type: 'Point', coordinates: s }, properties: { zone: f.properties.zone_a } });
+            if (!centroidMap.has(ke)) centroidMap.set(ke, { type: 'Feature', geometry: { type: 'Point', coordinates: e }, properties: { zone: f.properties.zone_b } });
+          }
+          if (m.getSource('region-centroids-src'))
+            m.getSource('region-centroids-src').setData({ type: 'FeatureCollection', features: [...centroidMap.values()] });
+          for (const id of ['region-corridors-ex', 'region-corridors-labels', 'region-corridors-dots']) {
             if (m.getLayer(id))
               m.setLayoutProperty(id, 'visibility', corridorsOn ? 'visible' : 'none');
           }
@@ -475,13 +486,15 @@ export default function RegionPage() {
       if (map.getLayer('region-fill'))         map.setLayoutProperty('region-fill', 'visibility', 'visible');
       if (map.getSource('region-zones'))
         map.getSource('region-zones').setData({ type: 'FeatureCollection', features: [] });
-      for (const id of ['region-corridors-ex', 'region-corridors-pl', 'region-corridors-labels']) {
+      for (const id of ['region-corridors-ex', 'region-corridors-labels', 'region-corridors-dots']) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
       }
       if (map.getSource('region-corridors-src'))
         map.getSource('region-corridors-src').setData({ type: 'FeatureCollection', features: [] });
+      if (map.getSource('region-centroids-src'))
+        map.getSource('region-centroids-src').setData({ type: 'FeatureCollection', features: [] });
     }
-  }, [mapMode, regionId, refineMode, corridorsOn]);
+  }, [mapMode, regionId, corridorsOn]);
 
   // ── Layer toggle handlers ─────────────────────────────────────────────────
 
@@ -582,7 +595,7 @@ export default function RegionPage() {
     if (!map) return;
     setCorridorsOn(prev => {
       const next = !prev;
-      for (const id of ['region-corridors-ex', 'region-corridors-pl', 'region-corridors-labels']) {
+      for (const id of ['region-corridors-ex', 'region-corridors-labels', 'region-corridors-dots']) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
       }
       return next;
@@ -794,28 +807,6 @@ export default function RegionPage() {
                   display: 'inline-block', transition: 'background 0.15s',
                 }} />
                 Corridors
-              </button>
-            )}
-            {mapMode === 'zones' && (
-              <button
-                onClick={() => setRefineMode(r => !r)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  fontSize: '0.58rem', letterSpacing: '0.5px', fontFamily: 'inherit',
-                  padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
-                  border: `1px solid ${refineMode ? 'rgba(144,190,109,0.6)' : t.panelBorder}`,
-                  backgroundColor: refineMode ? 'rgba(144,190,109,0.14)' : t.panel,
-                  color: refineMode ? t.lbl : t.lblMuted,
-                  fontWeight: refineMode ? 700 : 400,
-                  boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-                  transition: 'all 0.15s',
-                }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: 2,
-                  backgroundColor: refineMode ? 'rgba(144,190,109,0.8)' : t.panelBorder,
-                  display: 'inline-block', transition: 'background 0.15s',
-                }} />
-                Refine
               </button>
             )}
           </div>

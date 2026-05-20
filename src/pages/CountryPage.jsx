@@ -217,7 +217,8 @@ export default function CountryPage() {
       map.addSource('zone-fills',        { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource('zone-inner',        { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource('zone-lines',        { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addSource('zone-corridors-src',{ type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-corridors-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('zone-centroids-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
       const tv = getT(theme);
 
@@ -365,7 +366,7 @@ export default function CountryPage() {
         paint: { 'line-color': '#444', 'line-width': 2.5, 'line-opacity': 0.6, 'line-dasharray': [5, 4] },
       });
 
-      // Corridor capacity lines (existing = solid blue, planned = dashed amber)
+      // Corridor capacity lines (existing only — no planned)
       const mwWidthExpr = ['interpolate', ['linear'], ['get', 'mw'], 0, 1.5, 500, 3.0, 2000, 6.0];
       map.addLayer({
         id: 'zone-corridors-ex', type: 'line', source: 'zone-corridors-src',
@@ -374,13 +375,8 @@ export default function CountryPage() {
         paint: { 'line-color': '#1a5fa8', 'line-width': mwWidthExpr, 'line-opacity': 0.85 },
       });
       map.addLayer({
-        id: 'zone-corridors-pl', type: 'line', source: 'zone-corridors-src',
-        filter: ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]],
-        layout: { visibility: 'none' },
-        paint: { 'line-color': '#a06800', 'line-width': mwWidthExpr, 'line-opacity': 0.75, 'line-dasharray': [5, 4] },
-      });
-      map.addLayer({
         id: 'zone-corridors-labels', type: 'symbol', source: 'zone-corridors-src',
+        filter: ['!', ['in', ['get', 'status'], ['literal', ['planned', 'candidate', 'long_term']]]],
         layout: {
           visibility: 'none',
           'text-field': ['get', 'label'],
@@ -392,6 +388,15 @@ export default function CountryPage() {
           'text-color': '#1a5fa8',
           'text-halo-color': 'rgba(255,255,255,0.9)',
           'text-halo-width': 1.5,
+        },
+      });
+      map.addLayer({
+        id: 'zone-corridors-dots', type: 'circle', source: 'zone-centroids-src',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': 4, 'circle-color': '#696969',
+          'circle-opacity': 0.75,
+          'circle-stroke-width': 1.2, 'circle-stroke-color': 'rgba(255,255,255,0.7)',
         },
       });
 
@@ -548,7 +553,7 @@ export default function CountryPage() {
     if (!map) return;
     setZoneCorridorsOn(prev => {
       const next = !prev;
-      for (const id of ['zone-corridors-ex', 'zone-corridors-pl', 'zone-corridors-labels']) {
+      for (const id of ['zone-corridors-ex', 'zone-corridors-labels', 'zone-corridors-dots']) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
       }
       return next;
@@ -612,7 +617,7 @@ export default function CountryPage() {
       for (const id of ZONE_IDS) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
       }
-      for (const id of ['zone-corridors-ex', 'zone-corridors-pl', 'zone-corridors-labels']) {
+      for (const id of ['zone-corridors-ex', 'zone-corridors-labels', 'zone-corridors-dots']) {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
       }
       return;
@@ -653,10 +658,22 @@ export default function CountryPage() {
         }));
       map.getSource('zone-lines').setData({ type: 'FeatureCollection', features: lineFeatures });
 
-      // Corridor capacity overlay
-      if (corridorsGJ && map.getSource('zone-corridors-src'))
-        map.getSource('zone-corridors-src').setData(corridorsGJ);
-      for (const id of ['zone-corridors-ex', 'zone-corridors-pl', 'zone-corridors-labels']) {
+      // Corridor capacity overlay — always update source (clear if no file for this zone count)
+      const emptyGJ = { type: 'FeatureCollection', features: [] };
+      if (map.getSource('zone-corridors-src'))
+        map.getSource('zone-corridors-src').setData(corridorsGJ || emptyGJ);
+      // Extract unique zone centroids from corridor endpoints
+      const centroidMap = new Map();
+      for (const f of (corridorsGJ?.features || [])) {
+        const [s, e] = [f.geometry.coordinates[0], f.geometry.coordinates[f.geometry.coordinates.length - 1]];
+        const ks = `${s[0]},${s[1]}`;
+        const ke = `${e[0]},${e[1]}`;
+        if (!centroidMap.has(ks)) centroidMap.set(ks, { type: 'Feature', geometry: { type: 'Point', coordinates: s }, properties: { zone: f.properties.zone_a } });
+        if (!centroidMap.has(ke)) centroidMap.set(ke, { type: 'Feature', geometry: { type: 'Point', coordinates: e }, properties: { zone: f.properties.zone_b } });
+      }
+      if (map.getSource('zone-centroids-src'))
+        map.getSource('zone-centroids-src').setData({ type: 'FeatureCollection', features: [...centroidMap.values()] });
+      for (const id of ['zone-corridors-ex', 'zone-corridors-labels', 'zone-corridors-dots']) {
         if (map.getLayer(id))
           map.setLayoutProperty(id, 'visibility', zoneCorridorsOn ? 'visible' : 'none');
       }

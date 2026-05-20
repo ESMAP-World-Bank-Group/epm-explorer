@@ -67,7 +67,7 @@ export const THEMES = {
     worldBdr: 'rgba(80,85,110,0.5)', worldBdrW: 0.5,
     rgnBdr: 'rgba(180,185,210,0.60)', rgnBdrW: 1.1, rgnOp: 0.25,
     navBg: '#0A0B0F',
-    highlight: { fill: 'rgba(120,130,200,1)', border: 'rgba(160,170,240,0.80)', borderW: 1.2 },
+    highlight: { fill: 'rgba(120,130,200,1)', border: 'rgba(200,200,200,0.72)', borderW: 1.2 },
   },
   paper: {
     isDark: false, label: 'Paper', swatch: '#E8E0CC', cartoBg: 'light_all', cartoLabels: 'light_only_labels',
