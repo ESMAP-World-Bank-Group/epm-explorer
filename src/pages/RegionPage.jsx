@@ -83,7 +83,7 @@ export default function RegionPage() {
   const [activeTab,       setActiveTab]       = useState('overview');
   const [basemap,         setBasemap]         = useState('minimal');
   const [satLabels,       setSatLabels]       = useState(false);
-  const [mapMode,         setMapMode]         = useState('zones');
+  const [mapMode,         setMapMode]         = useState('countries');
   const [zonesAvailable,  setZonesAvailable]  = useState(false);
   const [corridorsOn,     setCorridorsOn]     = useState(false);
 
@@ -107,7 +107,7 @@ export default function RegionPage() {
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
 
-    setMapMode('zones'); setZonesAvailable(false); setCorridorsOn(false);
+    setMapMode('countries'); setZonesAvailable(false); setCorridorsOn(false);
     fetch(`/data/zones/${regionId}_preferred_zones.geojson`, { method: 'HEAD' })
       .then(r => setZonesAvailable(r.ok)).catch(() => {});
 
@@ -151,7 +151,7 @@ export default function RegionPage() {
 
     map.on('load', async () => {
       const [countries, plantsGJ, linesGJ, subsGJ, lcGJ] = await Promise.all([
-        fetch('/data/countries_110m.geojson').then(r => r.json()),
+        fetch('/data/countries_10m.geojson').then(r => r.json()),
         fetch(`/data/cache/region_plants_${regionId}.geojson`).then(r => r.json()),
         fetch(`/data/cache/region_lines_${regionId}.geojson`).then(r => r.json()),
         fetch(`/data/cache/region_substations_${regionId}.geojson`)
@@ -433,19 +433,6 @@ export default function RegionPage() {
     const map = mapRef.current;
     if (!map?.getLayer('region-zones-fill')) return;
     const showZones = mapMode === 'zones';
-
-    // Always use 10m land when zones are visible for crisp coastlines
-    const landUrl = showZones ? '/data/countries_10m.geojson' : '/data/countries_110m.geojson';
-    fetch(landUrl).then(r => r.json()).then(data => {
-      data.features.forEach((f, i) => {
-        const p = f.properties;
-        let iso = p.ISO_A3 || '-99';
-        if (iso === '-99') iso = p.ISO_A3_EH || '-99';
-        if (iso === '-99') iso = p.ADM0_A3 || '-99';
-        p.ISO_A3 = iso; f.id = i;
-      });
-      mapRef.current?.getSource('countries')?.setData(data);
-    }).catch(() => {});
 
     if (showZones) {
       const url = `/data/zones/${regionId}_preferred_zones_hd.geojson`;
