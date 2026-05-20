@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Data pipeline intermediates (generated, not committed)
+data-source/cache/
+data-source/*.csv
+data-source/gem/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

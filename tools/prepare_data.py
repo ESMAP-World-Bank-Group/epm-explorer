@@ -1,9 +1,19 @@
-"""Convert epm-explorer data files to GeoJSON for MapLibre."""
+"""
+Convert data-source/cache/ intermediate JSON files to GeoJSON for the app.
+
+Run after prepare_region_data.py and/or prepare_gppd.py.
+
+Usage:
+    python tools/prepare_data.py                          # all regions
+    python tools/prepare_data.py --regions asean eu       # specific regions only
+"""
+import argparse
 import json
 import math
-import yaml
 import shutil
+import yaml
 from pathlib import Path
+
 
 def _safe_mw(v):
     try:
@@ -12,25 +22,26 @@ def _safe_mw(v):
     except (TypeError, ValueError):
         return 0.0
 
-SRC  = Path(__file__).resolve().parents[2] / "epm-explorer" / "data"
-DST  = Path(__file__).resolve().parents[1] / "public" / "data"
+
+_ROOT = Path(__file__).resolve().parents[1]
+SRC   = _ROOT / "data-source"
+DST   = _ROOT / "public" / "data"
 DST.mkdir(parents=True, exist_ok=True)
 (DST / "cache").mkdir(exist_ok=True)
 
-# 1. regions.yaml → regions.json
-with open(SRC / "regions.yaml", encoding="utf-8") as f:
-    regions = yaml.safe_load(f)
-with open(DST / "regions.json", "w", encoding="utf-8") as f:
-    json.dump(regions, f)
-print("✓ regions.json")
 
-# 2. countries_110m.geojson (copy as-is)
-shutil.copy(SRC / "countries_110m.geojson", DST / "countries_110m.geojson")
-print("✓ countries_110m.geojson")
+def load_region_ids(only=None):
+    with open(SRC / "regions.yaml", encoding="utf-8") as f:
+        regions = [r for r in yaml.safe_load(f)["regions"] if r["status"] == "available"]
+    if only:
+        regions = [r for r in regions if r["id"] in only]
+    return [r["id"] for r in regions]
 
-# 3. plants: {lat,lon,name,fuel,mw} → GeoJSON FeatureCollection
-for src_path in (SRC / "cache").glob("region_plants_*.json"):
-    region_id = src_path.stem.replace("region_plants_", "")
+
+def convert_plants(region_id, suffix=""):
+    src_path = SRC / "cache" / f"region_plants_{region_id}{suffix}.json"
+    if not src_path.exists():
+        return
     plants = json.loads(src_path.read_text(encoding="utf-8"))
     geojson = {
         "type": "FeatureCollection",
@@ -51,13 +62,15 @@ for src_path in (SRC / "cache").glob("region_plants_*.json"):
             if p.get("lat") and p.get("lon")
         ],
     }
-    out = DST / "cache" / f"region_plants_{region_id}.geojson"
+    out = DST / "cache" / f"region_plants_{region_id}{suffix}.geojson"
     out.write_text(json.dumps(geojson), encoding="utf-8")
-    print(f"✓ {out.name}  ({len(geojson['features'])} plants)")
+    print(f"  {out.name}  ({len(geojson['features'])} plants)")
 
-# 4. lines: {v, lats, lons} → GeoJSON FeatureCollection
-for src_path in (SRC / "cache").glob("region_lines_*.json"):
-    region_id = src_path.stem.replace("region_lines_", "")
+
+def convert_lines(region_id):
+    src_path = SRC / "cache" / f"region_lines_{region_id}.json"
+    if not src_path.exists():
+        return
     data = json.loads(src_path.read_text(encoding="utf-8"))
     geojson = {
         "type": "FeatureCollection",
@@ -76,19 +89,13 @@ for src_path in (SRC / "cache").glob("region_lines_*.json"):
     }
     out = DST / "cache" / f"region_lines_{region_id}.geojson"
     out.write_text(json.dumps(geojson), encoding="utf-8")
-    print(f"✓ {out.name}  ({len(geojson['features'])} segments)")
+    print(f"  {out.name}  ({len(geojson['features'])} segments)")
 
-# 5. capacity summary (copy as-is — already clean JSON)
-for src_path in (SRC / "cache").glob("region_capacity_*.json"):
-    region_id = src_path.stem.replace("region_capacity_", "")
-    dst = DST / "cache" / f"region_capacity_{region_id}.json"
-    shutil.copy(src_path, dst)
-    n = len(json.loads(dst.read_text(encoding="utf-8")).get("countries", {}))
-    print(f"✓ region_capacity_{region_id}.json  ({n} countries)")
 
-# 6. substations: [{lat,lon,name,v}] → GeoJSON FeatureCollection
-for src_path in (SRC / "cache").glob("region_substations_*.json"):
-    region_id = src_path.stem.replace("region_substations_", "")
+def convert_substations(region_id):
+    src_path = SRC / "cache" / f"region_substations_{region_id}.json"
+    if not src_path.exists():
+        return
     subs = json.loads(src_path.read_text(encoding="utf-8"))
     geojson = {
         "type": "FeatureCollection",
@@ -107,13 +114,36 @@ for src_path in (SRC / "cache").glob("region_substations_*.json"):
     }
     out = DST / "cache" / f"region_substations_{region_id}.geojson"
     out.write_text(json.dumps(geojson), encoding="utf-8")
-    print(f"✓ {out.name}  ({len(geojson['features'])} substations)")
+    print(f"  {out.name}  ({len(geojson['features'])} substations)")
 
-# 7. fleet age (copy as-is — already clean JSON)
-for src_path in (SRC / "cache").glob("region_age_*.json"):
-    region_id = src_path.stem.replace("region_age_", "")
-    dst = DST / "cache" / f"region_age_{region_id}.json"
+
+def copy_json(region_id, kind, suffix=""):
+    src_path = SRC / "cache" / f"region_{kind}_{region_id}{suffix}.json"
+    if not src_path.exists():
+        return
+    dst = DST / "cache" / f"region_{kind}_{region_id}{suffix}.json"
     shutil.copy(src_path, dst)
-    print(f"✓ region_age_{region_id}.json")
+    print(f"  {dst.name}")
 
-print("\nAll done.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--regions", nargs="+", metavar="ID",
+                        help="Only process these region IDs (e.g. --regions asean eu)")
+    args = parser.parse_args()
+
+    region_ids = load_region_ids(only=set(args.regions) if args.regions else None)
+
+    for rid in region_ids:
+        print(f"\n── {rid} ──")
+        convert_plants(rid)
+        convert_plants(rid, "_gppd")
+        convert_plants(rid, "_gem")
+        convert_lines(rid)
+        convert_substations(rid)
+        copy_json(rid, "capacity")
+        copy_json(rid, "capacity", "_gppd")
+        copy_json(rid, "capacity", "_gem")
+        copy_json(rid, "age", "_gppd")
+
+    print("\nAll done.")
