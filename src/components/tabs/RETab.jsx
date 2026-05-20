@@ -55,7 +55,7 @@ export default function RETab({ branch, model }) {
       seasons:    [...new Set(data.map(r => r[seasonCol]  ?? ''))].filter(Boolean),
       dayTypes:   [...new Set(data.map(r => r[daytypeCol] ?? ''))].filter(Boolean),
       techs:      [...new Set(data.map(r => r[techCol]    ?? ''))].filter(Boolean),
-      zones:      [...new Set(data.map(r => r.zone ?? r.Zone ?? ''))].filter(Boolean),
+      zones:      [...new Set(data.map(r => r.zone ?? r.Zone ?? r.z ?? ''))].filter(Boolean),
       hourCols,
       seasonCol,
       daytypeCol,
@@ -175,7 +175,7 @@ export default function RETab({ branch, model }) {
                   </td>
                   {seasons.map(s => {
                     const rows = (data ?? []).filter(r =>
-                      (r.zone ?? r.Zone ?? '') === z &&
+                      (r.zone ?? r.Zone ?? r.z ?? '') === z &&
                       r.tech === tech &&
                       r[seasonCol] === s
                     )

@@ -120,7 +120,7 @@ export default function OverviewTab({ branch, model }) {
                 return (
                   <tr key={i}>
                     <td>{col(r, 'z', 'zone', 'Zone')}</td>
-                    <td>{col(r, 'g', 'plant', 'Plant', 'unit')}</td>
+                    <td>{col(r, 'g', 'gen', 'plant', 'Plant', 'unit')}</td>
                     <td>
                       <span className="tech-dot" style={{ background: techColor(tech) }} />
                       {tech}
