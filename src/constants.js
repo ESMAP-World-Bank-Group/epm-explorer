@@ -1,17 +1,17 @@
 export const FUEL_COLORS = {
-  solar:      '#FFD43B',
-  wind:       '#66D9E8',
-  hydro:      '#4DABF7',
-  gas:        '#8B4513',
-  coal:       '#868E96',
-  nuclear:    '#FF6B00',
-  oil:        '#4A4240',
-  biomass:    '#40C057',
-  geothermal: '#B8860B',
-  diesel:     '#3C3C3C',
-  waste:      '#ADB5BD',
-  biogas:     '#69DB7C',
-  wood:       '#66A80F',
+  solar:      '#FFD700',
+  wind:       '#44DAEC',
+  hydro:      '#1E9AF5',
+  gas:        '#9A7040',
+  coal:       '#808890',
+  nuclear:    '#C8A8F0',
+  oil:        '#7A7068',
+  biomass:    '#52C860',
+  geothermal: '#D4A820',
+  diesel:     '#6A7888',
+  waste:      '#8A9098',
+  biogas:     '#72DC8A',
+  wood:       '#7AC030',
 };
 
 export const FUEL_LABELS = {
@@ -22,10 +22,14 @@ export const FUEL_LABELS = {
 };
 
 export const VOLTAGE_BRACKETS = [
-  { min: 500_000, color: '#F0A500', colorDark: '#ffe566', width: 2.2,  label: '500 kV+',    key: '500' },
-  { min: 330_000, color: '#D4780C', colorDark: '#f5b800', width: 1.5,  label: '330–500 kV', key: '330' },
-  { min: 220_000, color: '#A85C18', colorDark: '#c88000', width: 1.0,  label: '220–330 kV', key: '220' },
-  { min: 0,       color: '#704020', colorDark: '#7a5000', width: 0.65, label: '110–220 kV', key: '110' },
+  { min: 500_000, width: 2.2,  label: '500 kV+',    key: '500',
+    colors: { fog: '#0B7A85', paper: '#1A35A0', slate: '#AAEEFF', ink: '#FFEE33', forest: '#EAFF70', dusk: '#70FFD0' } },
+  { min: 330_000, width: 1.5,  label: '330–500 kV', key: '330',
+    colors: { fog: '#0DA8B8', paper: '#2B52D8', slate: '#44D8F8', ink: '#FFD040', forest: '#C8E830', dusk: '#28E8A8' } },
+  { min: 220_000, width: 1.0,  label: '220–330 kV', key: '220',
+    colors: { fog: '#3CC8D8', paper: '#5578EE', slate: '#00B0D0', ink: '#C8A000', forest: '#98B800', dusk: '#00B878' } },
+  { min: 0,       width: 0.65, label: '110–220 kV', key: '110',
+    colors: { fog: '#80DDE8', paper: '#8FAAEE', slate: '#007090', ink: '#906C00', forest: '#608000', dusk: '#007850' } },
 ];
 
 export const THEMES = {

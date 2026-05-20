@@ -322,9 +322,9 @@ export default function LayerPanel({
         )}
       </div>
 
-      {VOLTAGE_BRACKETS.map(({ color, colorDark, label, key }) => {
+      {VOLTAGE_BRACKETS.map(({ colors, label, key }) => {
         const off = kvsOff.has(key);
-        const lineColor = t.isDark ? colorDark : color;
+        const lineColor = colors[theme] ?? colors.fog;
         return (
           <div key={key} className="layer-row"
             onClick={() => onToggleKv(key)}
