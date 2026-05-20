@@ -191,11 +191,11 @@ export default function RegionPage() {
         '220': ['all', ['>=', ['get', 'v'], 220_000], ['<', ['get', 'v'], 330_000]],
         '110': ['<', ['get', 'v'], 220_000],
       };
-      for (const { color, width, key } of VOLTAGE_BRACKETS) {
+      for (const { color, colorDark, width, key } of VOLTAGE_BRACKETS) {
         map.addLayer({ id: `lines-${key}`, type: 'line', source: 'lines',
           filter: kvFilters[key],
-          paint: { 'line-color': color, 'line-width': width,
-            'line-opacity': tv.isDark ? 0.88 : 0.65 } });
+          paint: { 'line-color': tv.isDark ? colorDark : color, 'line-width': width,
+            'line-opacity': tv.isDark ? 0.92 : 0.65 } });
       }
 
       // Region highlight

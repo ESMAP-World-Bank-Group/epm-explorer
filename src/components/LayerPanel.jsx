@@ -322,15 +322,16 @@ export default function LayerPanel({
         )}
       </div>
 
-      {VOLTAGE_BRACKETS.map(({ color, label, key }) => {
+      {VOLTAGE_BRACKETS.map(({ color, colorDark, label, key }) => {
         const off = kvsOff.has(key);
+        const lineColor = t.isDark ? colorDark : color;
         return (
           <div key={key} className="layer-row"
             onClick={() => onToggleKv(key)}
             style={{ opacity: (!linesOn || off) ? 0.22 : 1 }}>
             <span style={{
               display: 'inline-block', width: 16, height: 2,
-              backgroundColor: color, marginRight: 7,
+              backgroundColor: lineColor, marginRight: 7,
               borderRadius: 1, flexShrink: 0,
             }} />
             <span style={{ fontSize: '0.62rem', color: t.lblRow }}>{label}</span>

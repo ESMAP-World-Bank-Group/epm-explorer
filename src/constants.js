@@ -22,10 +22,10 @@ export const FUEL_LABELS = {
 };
 
 export const VOLTAGE_BRACKETS = [
-  { min: 500_000, color: '#F0A500', width: 2.2,  label: '500 kV+',    key: '500' },
-  { min: 330_000, color: '#D4780C', width: 1.5,  label: '330–500 kV', key: '330' },
-  { min: 220_000, color: '#A85C18', width: 1.0,  label: '220–330 kV', key: '220' },
-  { min: 0,       color: '#704020', width: 0.65, label: '110–220 kV', key: '110' },
+  { min: 500_000, color: '#F0A500', colorDark: '#ffe566', width: 2.2,  label: '500 kV+',    key: '500' },
+  { min: 330_000, color: '#D4780C', colorDark: '#f5b800', width: 1.5,  label: '330–500 kV', key: '330' },
+  { min: 220_000, color: '#A85C18', colorDark: '#c88000', width: 1.0,  label: '220–330 kV', key: '220' },
+  { min: 0,       color: '#704020', colorDark: '#7a5000', width: 0.65, label: '110–220 kV', key: '110' },
 ];
 
 export const THEMES = {
