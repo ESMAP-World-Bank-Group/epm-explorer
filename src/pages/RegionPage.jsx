@@ -83,7 +83,7 @@ export default function RegionPage() {
   const [activeTab,       setActiveTab]       = useState('overview');
   const [basemap,         setBasemap]         = useState('minimal');
   const [satLabels,       setSatLabels]       = useState(false);
-  const [mapMode,         setMapMode]         = useState('countries');
+  const [mapMode,         setMapMode]         = useState('zones');
   const [zonesAvailable,  setZonesAvailable]  = useState(false);
   const [corridorsOn,     setCorridorsOn]     = useState(false);
 
@@ -107,7 +107,7 @@ export default function RegionPage() {
     setMinMw(100); setCircleScale(1.0);
     setPlantSource('osm'); setActiveTab('overview');
 
-    setMapMode('countries'); setZonesAvailable(false); setCorridorsOn(false);
+    setMapMode('zones'); setZonesAvailable(false); setCorridorsOn(false);
     fetch(`/data/zones/${regionId}_preferred_zones.geojson`, { method: 'HEAD' })
       .then(r => setZonesAvailable(r.ok)).catch(() => {});
 
