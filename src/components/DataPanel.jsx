@@ -1,18 +1,23 @@
 import { useState } from 'react'
-import OverviewTab from './tabs/OverviewTab'
-import LoadTab from './tabs/LoadTab'
-import CapacityTab from './tabs/CapacityTab'
-import RETab from './tabs/RETab'
+import OverviewTab   from './tabs/OverviewTab'
+import LoadTab       from './tabs/LoadTab'
+import SupplyTab     from './tabs/SupplyTab'
+import ResourcesTab  from './tabs/ResourcesTab'
+import TopologyTab   from './tabs/TopologyTab'
+import AboutTab      from './tabs/AboutTab'
 
 const TABS = [
-  { key: 'overview',  label: 'Overview'  },
-  { key: 'load',      label: 'Load'      },
-  { key: 'capacity',  label: 'Capacity'  },
-  { key: 're',        label: 'RE Profiles' },
+  { key: 'overview',  label: 'Overview'       },
+  { key: 'load',      label: 'Load'           },
+  { key: 'supply',    label: 'Supply'         },
+  { key: 'resources', label: 'Resources'      },
+  { key: 'topology',  label: 'Topology'       },
+  { key: 'about',     label: 'About'          },
 ]
 
-export default function DataPanel({ branch, model }) {
+export default function DataPanel({ branch, model, selectedZone }) {
   const [active, setActive] = useState('overview')
+  const props = { branch, model, selectedZone }
 
   return (
     <div className="data-panel">
@@ -28,10 +33,12 @@ export default function DataPanel({ branch, model }) {
         ))}
       </div>
       <div className="tab-content">
-        {active === 'overview'  && <OverviewTab  branch={branch} model={model} />}
-        {active === 'load'      && <LoadTab      branch={branch} model={model} />}
-        {active === 'capacity'  && <CapacityTab  branch={branch} model={model} />}
-        {active === 're'        && <RETab        branch={branch} model={model} />}
+        {active === 'overview'  && <OverviewTab  {...props} />}
+        {active === 'load'      && <LoadTab      {...props} />}
+        {active === 'supply'    && <SupplyTab    {...props} />}
+        {active === 'resources' && <ResourcesTab {...props} />}
+        {active === 'topology'  && <TopologyTab  {...props} />}
+        {active === 'about'     && <AboutTab     {...props} />}
       </div>
     </div>
   )

@@ -4,12 +4,13 @@ const TOKEN = import.meta.env.VITE_GITHUB_TOKEN  || ''
 
 const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}
 
-export const BRANCH_PATTERN = /^([a-z_]+)_(\d{4})$/
+// Accepts eapp_2026 AND sapp_new2025 (no underscore before year)
+export const BRANCH_PATTERN = /^([a-z][a-z_]*)_?(\d{4})$/
 
 export function parseBranch(name) {
   const m = name.match(BRANCH_PATTERN)
   if (!m) return null
-  return { branch: name, model: m[1], year: parseInt(m[2]) }
+  return { branch: name, model: m[1].replace(/_$/, ''), year: parseInt(m[2]) }
 }
 
 export async function listBranches() {

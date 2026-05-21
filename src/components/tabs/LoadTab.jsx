@@ -1,112 +1,128 @@
-import { useMemo } from 'react'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
+import { useMemo, useState } from 'react'
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useCSV } from '../../hooks/useGitHub'
 import { rawUrl } from '../../api/github'
 
-const CHART_STYLE = {
-  cartesianGrid: { strokeDasharray: '3 3', stroke: '#2a2f47' },
+const CHART = {
+  grid: { strokeDasharray: '3 3', stroke: '#2a2f47' },
   tooltip: { contentStyle: { background: '#161924', border: '1px solid #2a2f47', fontSize: 12 } },
-  xAxis: { tick: { fill: '#7c879f', fontSize: 11 } },
-  yAxis: { tick: { fill: '#7c879f', fontSize: 11 }, width: 70 },
+  axis: { tick: { fill: '#7c879f', fontSize: 11 } },
+}
+const HOUR_COLS_t1  = Array.from({ length: 24 }, (_, i) => `t${i + 1}`)
+const HOUR_COLS_t01 = Array.from({ length: 24 }, (_, i) => `t${String(i + 1).padStart(2, '0')}`)
+
+function detectHours(row) {
+  if (!row) return []
+  if (row['t1']  !== undefined) return HOUR_COLS_t1
+  if (row['t01'] !== undefined) return HOUR_COLS_t01
+  return HOUR_COLS_t1
 }
 
-function isType(val, target) {
-  return String(val ?? '').toLowerCase() === target
-}
-
-export default function LoadTab({ branch, model }) {
+export default function LoadTab({ branch, model, selectedZone }) {
   const df = model?.data_folder
-  const path = df ? `epm/input/${df}/load/pDemandForecast.csv` : null
-  const { data, loading, error } = useCSV(branch, path)
+  const fcastPath   = df ? `epm/input/${df}/load/pDemandForecast.csv`  : null
+  const profilePath = df ? `epm/input/${df}/load/pDemandProfile.csv`   : null
 
-  const { peakSeries, energySeries, years } = useMemo(() => {
-    if (!data || !data.length) return { peakSeries: [], energySeries: [], years: [] }
+  const { data: fcast,   loading: fLoad } = useCSV(branch, fcastPath)
+  const { data: profile, loading: pLoad } = useCSV(branch, profilePath)
 
-    const yearCols = Object.keys(data[0]).filter(k => /^\d{4}$/.test(k))
-    const peakRows   = data.filter(r => isType(r.type ?? r.Type, 'peak'))
-    const energyRows = data.filter(r => isType(r.type ?? r.Type, 'energy'))
+  const [selSeason, setSelSeason] = useState('')
+  const [selDay,    setSelDay]    = useState('')
 
-    // Sum all zones
-    const sum = (rows, yr) => rows.reduce((acc, r) => acc + (parseFloat(r[yr]) || 0), 0)
+  const { trendData, years } = useMemo(() => {
+    if (!fcast?.length) return { trendData: [], years: [] }
+    const yearCols = Object.keys(fcast[0]).filter(k => /^\d{4}$/.test(k))
+    const rows = selectedZone ? fcast.filter(r => (r.z ?? r.zone ?? '') === selectedZone) : fcast
+
+    const sum = (type, yr) => rows
+      .filter(r => String(r.type ?? r.Type ?? '').toLowerCase() === type)
+      .reduce((s, r) => s + (parseFloat(r[yr]) || 0), 0)
 
     return {
-      peakSeries:   yearCols.map(yr => ({ year: parseInt(yr), value: sum(peakRows,   yr) })),
-      energySeries: yearCols.map(yr => ({ year: parseInt(yr), value: sum(energyRows, yr) })),
+      trendData: yearCols.map(yr => ({ year: parseInt(yr), peak: sum('peak', yr), energy: sum('energy', yr) })),
       years: yearCols,
     }
-  }, [data])
+  }, [fcast, selectedZone])
+
+  const { seasons, dayTypes, profileData } = useMemo(() => {
+    if (!profile?.length) return { seasons: [], dayTypes: [], profileData: [] }
+    const rows = selectedZone ? profile.filter(r => (r.z ?? r.zone ?? '') === selectedZone) : profile
+    const seasonCol  = ['q', 'season', 'Season'].find(k => rows[0]?.[k] !== undefined) ?? 'q'
+    const daytypeCol = ['d', 'daytype', 'DayType'].find(k => rows[0]?.[k] !== undefined) ?? 'd'
+    const hourCols   = detectHours(rows[0])
+
+    const seasons  = [...new Set(rows.map(r => r[seasonCol]))].filter(Boolean)
+    const dayTypes = [...new Set(rows.map(r => r[daytypeCol]))].filter(Boolean)
+
+    const s = selSeason || seasons[0] || ''
+    const d = selDay    || dayTypes[0] || ''
+
+    const filtered = rows.filter(r => r[seasonCol] === s && r[daytypeCol] === d)
+    const profileData = hourCols.map((h, i) => ({
+      hour: i + 1,
+      load: filtered.length
+        ? filtered.reduce((sum, r) => sum + (parseFloat(r[h]) || 0), 0) / filtered.length
+        : 0,
+    }))
+    return { seasons, dayTypes, profileData }
+  }, [profile, selectedZone, selSeason, selDay])
 
   if (!df) return <div className="empty-msg">Model metadata not available</div>
-  if (loading) return <div className="loading-center" style={{ height: 200 }}>Loading…</div>
-  if (error) return <div className="error-msg">Could not load pDemandForecast.csv</div>
-  if (!data || !data.length) return <div className="empty-msg">No demand forecast data found</div>
 
   return (
     <div>
-      <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {selectedZone && <div className="zone-filter-note">Filtered to: <strong>{selectedZone}</strong></div>}
+
+      <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span>Demand Forecast</span>
-        {path && <a className="dl-btn" href={rawUrl(branch, path)} download>↓ CSV</a>}
+        {fcastPath && <a className="dl-btn" href={rawUrl(branch, fcastPath)} download>↓ CSV</a>}
       </div>
 
-      {peakSeries.length > 0 && (
+      {!fLoad && trendData.length > 0 && (
         <div className="chart-card">
-          <div className="chart-card-title">Peak Demand (MW)</div>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={peakSeries} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-              <CartesianGrid {...CHART_STYLE.cartesianGrid} />
-              <XAxis dataKey="year" {...CHART_STYLE.xAxis} />
-              <YAxis {...CHART_STYLE.yAxis} tickFormatter={v => v.toLocaleString()} />
-              <Tooltip {...CHART_STYLE.tooltip} formatter={v => [`${v.toLocaleString()} MW`, 'Peak']} />
-              <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-            </LineChart>
+          <div className="chart-card-title">Peak (MW) and Energy (GWh) — dual axis</div>
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={trendData} margin={{ top: 4, right: 60, bottom: 0, left: 0 }}>
+              <CartesianGrid {...CHART.grid} />
+              <XAxis dataKey="year" {...CHART.axis} />
+              <YAxis yAxisId="left"  {...CHART.axis} tickFormatter={v => v.toLocaleString()} label={{ value: 'MW',  angle: -90, position: 'insideLeft',  fill: '#7c879f', fontSize: 11, dy: 30 }} />
+              <YAxis yAxisId="right" orientation="right" {...CHART.axis} tickFormatter={v => v.toLocaleString()} label={{ value: 'GWh', angle: 90,  position: 'insideRight', fill: '#7c879f', fontSize: 11, dy: -20 }} />
+              <Tooltip {...CHART.tooltip} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line yAxisId="left"  type="monotone" dataKey="peak"   stroke="#3b82f6" strokeWidth={2} dot={false} name="Peak (MW)"   />
+              <Line yAxisId="right" type="monotone" dataKey="energy" stroke="#f59e0b" strokeWidth={2} dot={false} name="Energy (GWh)" />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      {energySeries.length > 0 && (
-        <div className="chart-card">
-          <div className="chart-card-title">Energy Demand (GWh)</div>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={energySeries} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
-              <CartesianGrid {...CHART_STYLE.cartesianGrid} />
-              <XAxis dataKey="year" {...CHART_STYLE.xAxis} />
-              <YAxis {...CHART_STYLE.yAxis} tickFormatter={v => v.toLocaleString()} />
-              <Tooltip {...CHART_STYLE.tooltip} formatter={v => [`${v.toLocaleString()} GWh`, 'Energy']} />
-              <Line type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Zone breakdown — show first 8 year columns */}
-      {data.length > 0 && (
+      {!pLoad && profile?.length > 0 && (
         <>
-          <div className="section-title">By Zone</div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Zone</th>
-                  <th>Type</th>
-                  {years.slice(0, 8).map(y => <th key={y} className="num">{y}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((r, i) => (
-                  <tr key={i}>
-                    <td>{r.z ?? r.zone ?? r.Zone ?? '—'}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{r.type ?? r.Type ?? '—'}</td>
-                    {years.slice(0, 8).map(y => (
-                      <td key={y} className="num">
-                        {r[y] != null ? Number(r[y]).toLocaleString() : '—'}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Load Profile</span>
+            {profilePath && <a className="dl-btn" href={rawUrl(branch, profilePath)} download>↓ CSV</a>}
+          </div>
+          <div className="filter-row">
+            <span className="filter-label">Season</span>
+            <select className="filter-select" value={selSeason || seasons[0] || ''} onChange={e => setSelSeason(e.target.value)}>
+              {seasons.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <span className="filter-label">Day type</span>
+            <select className="filter-select" value={selDay || dayTypes[0] || ''} onChange={e => setSelDay(e.target.value)}>
+              {dayTypes.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="chart-card">
+            <div className="chart-card-title">Normalised load profile (p.u.)</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={profileData} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
+                <CartesianGrid {...CHART.grid} />
+                <XAxis dataKey="hour" {...CHART.axis} />
+                <YAxis {...CHART.axis} domain={[0, 1]} tickFormatter={v => v.toFixed(1)} />
+                <Tooltip {...CHART.tooltip} formatter={v => [v.toFixed(3), 'Load (p.u.)']} labelFormatter={l => `Hour ${l}`} />
+                <Line type="monotone" dataKey="load" stroke="#60a5fa" strokeWidth={2} dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </>
       )}
