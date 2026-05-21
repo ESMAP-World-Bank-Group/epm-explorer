@@ -1,193 +1,201 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import { getModelBounds, buildIsoZoneMap, ZONE_TO_ISO } from '../utils/models'
+import { useTheme } from '../App'
+import { getT, mapStyle, swapBasemap } from '../constants'
+import { getModelBounds, computeIsoBounds, ZONE_TO_ISO } from '../utils/models'
 import { rawUrl } from '../api/github'
 
 const NE50_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson'
 
-const TILES = {
-  dark:      'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png',
-  light:     'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-}
-const LABEL_TILES = 'https://a.basemaps.cartocdn.com/only_labels/{z}/{x}/{y}.png'
-
 let ne50Promise = null
 function getNE50() {
-  if (!ne50Promise) ne50Promise = fetch(NE50_URL).then(r => r.json())
+  if (!ne50Promise) ne50Promise = fetch(NE50_URL).then(r => r.json()).then(gj => {
+    // Normalize ISO field
+    gj.features.forEach((f, i) => {
+      const p = f.properties
+      let iso = p.ISO_A3 || '-99'
+      if (iso === '-99') iso = p.ISO_A3_EH || '-99'
+      if (iso === '-99') iso = p.ADM0_A3 || '-99'
+      p.ISO_A3 = iso; f.id = i
+    })
+    return gj
+  })
   return ne50Promise
 }
 
-export default function MapPanel({ branch, model, meta, selectedZone, onZoneClick }) {
-  const mapRef       = useRef(null)
-  const mapInstance  = useRef(null)
-  const [basemap, setBasemap] = useState('dark')
+export default function MapPanel({ branch, model, meta, selectedISO, onCountryClick }) {
+  const { theme } = useTheme()
+  const t = getT(theme)
+  const mapRef      = useRef(null)
+  const mapInstance = useRef(null)
+  const geojsonRef  = useRef(null)
+  const [basemap, setBasemap] = useState('minimal')
   const [mapReady, setMapReady] = useState(false)
 
   const countries = useMemo(() => model?.countries ?? meta?.countries ?? [], [model, meta])
+  const countriesKey = countries.join(',')
 
-  // Derive zone list from model or ZONE_TO_ISO keys
-  const zones = useMemo(() => {
-    if (model?.zones?.length) return model.zones
-    // Fall back: any zones that map to one of the model's countries
-    return Object.entries(ZONE_TO_ISO)
-      .filter(([, iso]) => countries.includes(iso))
-      .map(([z]) => z)
+  // Derive clickable ISOs from model zones
+  const modelISOs = useMemo(() => {
+    const zones = model?.zones ?? []
+    if (zones.length) {
+      return [...new Set(zones.map(z => ZONE_TO_ISO[z]).filter(Boolean))]
+    }
+    return countries
   }, [model, countries])
 
-  const isoZoneMap = useMemo(() => buildIsoZoneMap(zones), [zones])
-  const isoZoneMapRef = useRef(isoZoneMap)
-  isoZoneMapRef.current = isoZoneMap
+  const onCountryClickRef = useRef(onCountryClick)
+  onCountryClickRef.current = onCountryClick
 
-  const onZoneClickRef = useRef(onZoneClick)
-  onZoneClickRef.current = onZoneClick
-
-  // Initialize map once
+  // Init map once
   useEffect(() => {
+    const tv = getT(theme)
     const map = new maplibregl.Map({
       container: mapRef.current,
-      style: {
-        version: 8,
-        sources: {
-          basemap: { type: 'raster', tiles: [TILES.dark], tileSize: 256, attribution: '© CartoDB © OpenStreetMap' },
-        },
-        layers: [{ id: 'basemap', type: 'raster', source: 'basemap' }],
-      },
-      center: [30, 42],
-      zoom: 3,
+      style: mapStyle(theme),
+      center: [30, 15], zoom: 3, minZoom: 1, maxZoom: 12,
       attributionControl: false,
     })
-    map.addControl(new maplibregl.AttributionControl({ compact: true }))
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     mapInstance.current = map
 
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10, className: `popup-${tv.isDark ? 'dark' : 'light'}` })
+
     map.on('load', async () => {
       const geojson = await getNE50()
+      geojsonRef.current = geojson
 
-      map.addSource('countries', { type: 'geojson', data: geojson })
-      map.addSource('countries-selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addSource('countries', { type: 'geojson', data: geojson, generateId: false })
 
-      map.addLayer({ id: 'countries-fill', type: 'fill', source: 'countries',
-        paint: { 'fill-color': '#141722', 'fill-opacity': 0.7 } })
-      map.addLayer({ id: 'countries-model', type: 'fill', source: 'countries',
-        paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0 } })
-      map.addLayer({ id: 'countries-selected-fill', type: 'fill', source: 'countries-selected',
-        paint: { 'fill-color': '#60a5fa', 'fill-opacity': 0.55 } })
-      map.addLayer({ id: 'countries-outline', type: 'line', source: 'countries',
-        paint: { 'line-color': '#1e2640', 'line-width': 0.4 } })
-      map.addLayer({ id: 'countries-model-outline', type: 'line', source: 'countries',
-        paint: { 'line-color': '#1e2640', 'line-width': 0 } })
+      map.addLayer({ id: 'land',    type: 'fill', source: 'countries', paint: { 'fill-color': tv.land, 'fill-opacity': 1 } })
+      map.addLayer({ id: 'borders', type: 'line', source: 'countries', paint: { 'line-color': tv.worldBdr, 'line-width': tv.worldBdrW } })
 
-      // Labels on top
-      map.addSource('labels', { type: 'raster', tiles: [LABEL_TILES], tileSize: 256 })
-      map.addLayer({ id: 'labels', type: 'raster', source: 'labels', paint: { 'raster-opacity': 0.7 } })
+      // Model area highlight
+      map.addLayer({ id: 'model-fill',   type: 'fill', source: 'countries',
+        paint: { 'fill-color': tv.highlight.fill, 'fill-opacity': 0 } })
+      map.addLayer({ id: 'model-border', type: 'line', source: 'countries',
+        paint: { 'line-color': tv.highlight.border, 'line-width': 0 } })
 
-      // Try to load interconnection lines
+      // Selected country highlight
+      map.addLayer({ id: 'selected-fill',   type: 'fill', source: 'countries',
+        filter: ['==', ['get', 'ISO_A3'], ''],
+        paint: { 'fill-color': tv.highlight.fill, 'fill-opacity': 0.45 } })
+      map.addLayer({ id: 'selected-border', type: 'line', source: 'countries',
+        filter: ['==', ['get', 'ISO_A3'], ''],
+        paint: { 'line-color': tv.highlight.border, 'line-width': tv.highlight.borderW * 1.8 } })
+
+      // Interconnection lines (optional, from branch)
       try {
         const df = model?.data_folder ?? `data_${branch?.replace(/_\d{4}$/, '')}`
-        const linesText = await fetch(rawUrl(branch, `epm/input/${df}/linestring_countries.geojson`))
-        if (linesText.ok) {
-          const linesGeo = await linesText.json()
+        const res = await fetch(rawUrl(branch, `epm/input/${df}/linestring_countries.geojson`))
+        if (res.ok) {
+          const linesGeo = await res.json()
           map.addSource('interco', { type: 'geojson', data: linesGeo })
           map.addLayer({ id: 'interco-lines', type: 'line', source: 'interco',
-            paint: { 'line-color': '#3b82f6', 'line-width': 1, 'line-opacity': 0.3 },
-          })
+            paint: { 'line-color': tv.highlight.fill, 'line-width': 1.2, 'line-opacity': 0.35 } })
         }
-      } catch { /* no lines available */ }
+      } catch { /* not available */ }
 
-      // Click handler
-      map.on('click', 'countries-model', e => {
-        const iso = e.features[0]?.properties?.ADM0_A3
-        if (!iso) return
-        const zone = isoZoneMapRef.current[iso]
-        if (zone) onZoneClickRef.current(zone)
+      // Hover + click
+      let hoveredId = null
+      map.on('mousemove', 'model-fill', e => {
+        map.getCanvas().style.cursor = 'pointer'
+        if (hoveredId !== null) map.setFeatureState({ source: 'countries', id: hoveredId }, { hover: false })
+        hoveredId = e.features[0].id
+        map.setFeatureState({ source: 'countries', id: hoveredId }, { hover: true })
+        const name = e.features[0].properties.NAME_LONG ?? e.features[0].properties.NAME ?? ''
+        popup.setLngLat(e.lngLat).setHTML(`<b>${name}</b>`).addTo(map)
       })
-      map.on('mousemove', 'countries-model', () => { map.getCanvas().style.cursor = 'pointer' })
-      map.on('mouseleave', 'countries-model', () => { map.getCanvas().style.cursor = '' })
+      map.on('mouseleave', 'model-fill', () => {
+        map.getCanvas().style.cursor = ''
+        if (hoveredId !== null) map.setFeatureState({ source: 'countries', id: hoveredId }, { hover: false })
+        hoveredId = null; popup.remove()
+      })
+      map.on('click', 'model-fill', e => {
+        const iso = e.features[0]?.properties?.ISO_A3
+        if (iso) onCountryClickRef.current(iso)
+      })
 
       setMapReady(true)
     })
 
-    return () => map.remove()
-  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { popup.remove(); map.remove() }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update highlighted countries when model loads
+  // Update model countries highlight + fit bounds
   useEffect(() => {
     if (!mapReady || !mapInstance.current) return
     const map = mapInstance.current
+    const tv  = getT(theme)
     const isos = countries
 
-    map.setPaintProperty('countries-fill', 'fill-color', [
-      'case', ['in', ['get', 'ADM0_A3'], ['literal', isos]], '#1e2235', '#0d0f16'
-    ])
-    map.setPaintProperty('countries-fill', 'fill-opacity', [
-      'case', ['in', ['get', 'ADM0_A3'], ['literal', isos]], 0.5, 0.75
-    ])
-    map.setPaintProperty('countries-model', 'fill-opacity', [
-      'case', ['in', ['get', 'ADM0_A3'], ['literal', isos]], 0.35, 0
-    ])
-    map.setPaintProperty('countries-model-outline', 'line-color', [
-      'case', ['in', ['get', 'ADM0_A3'], ['literal', isos]], '#60a5fa', 'transparent'
-    ])
-    map.setPaintProperty('countries-model-outline', 'line-width', [
-      'case', ['in', ['get', 'ADM0_A3'], ['literal', isos]], 1.2, 0
-    ])
-    map.setPaintProperty('countries-outline', 'line-color', [
-      'case', ['in', ['get', 'ADM0_A3'], ['literal', isos]], '#2a3a5c', '#161926'
-    ])
+    map.setPaintProperty('land',    'fill-color', tv.land)
+    map.setPaintProperty('borders', 'line-color', tv.worldBdr)
+    map.setPaintProperty('borders', 'line-width', tv.worldBdrW)
+    map.setPaintProperty('bg', 'background-color', tv.bg)
 
-    // Fit bounds
-    if (isos.length) {
-      const bounds = getModelBounds(isos)
-      if (bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 8, duration: 800 })
-    }
-  }, [mapReady, countries.join(',')])  // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isos.length) return
 
-  // Update selected zone highlight
+    map.setFilter('model-fill',   ['in', ['get', 'ISO_A3'], ['literal', isos]])
+    map.setFilter('model-border', ['in', ['get', 'ISO_A3'], ['literal', isos]])
+    map.setPaintProperty('model-fill',   'fill-color',  tv.highlight.fill)
+    map.setPaintProperty('model-fill',   'fill-opacity', ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0.12])
+    map.setPaintProperty('model-border', 'line-color',  tv.highlight.border)
+    map.setPaintProperty('model-border', 'line-width',  tv.highlight.borderW)
+
+    const bounds = getModelBounds(isos)
+    if (bounds) map.fitBounds(bounds, { padding: 50, maxZoom: 7, duration: 600 })
+  }, [mapReady, countriesKey, theme]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update selected country highlight + zoom
   useEffect(() => {
     if (!mapReady || !mapInstance.current) return
     const map = mapInstance.current
-    const selectedISO = selectedZone ? ZONE_TO_ISO[selectedZone] : null
-    const source = map.getSource('countries-selected')
-    if (!source) return
+    const tv  = getT(theme)
 
     if (!selectedISO) {
-      source.setData({ type: 'FeatureCollection', features: [] })
+      // Back to region view
+      map.setFilter('selected-fill',   ['==', ['get', 'ISO_A3'], ''])
+      map.setFilter('selected-border', ['==', ['get', 'ISO_A3'], ''])
+      map.setPaintProperty('model-fill', 'fill-opacity', ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0.12])
+      // Fly back to model bounds
+      const bounds = getModelBounds(countries)
+      if (bounds) map.fitBounds(bounds, { padding: 50, maxZoom: 7, duration: 700 })
       return
     }
-    // We don't have the full GeoJSON here, so use a filter on the existing countries source
-    map.setFilter('countries-selected-fill', ['==', ['get', 'ADM0_A3'], selectedISO])
-    map.setPaintProperty('countries-selected-fill', 'fill-opacity', 0.55)
-    // Use countries source for selected highlight instead
-    map.setPaintProperty('countries-model', 'fill-color', [
-      'case',
-      ['==', ['get', 'ADM0_A3'], selectedISO], '#60a5fa',
-      '#3b82f6',
-    ])
-  }, [mapReady, selectedZone])
 
-  // Update basemap tiles
+    // Highlight selected, dim others
+    map.setFilter('selected-fill',   ['==', ['get', 'ISO_A3'], selectedISO])
+    map.setFilter('selected-border', ['==', ['get', 'ISO_A3'], selectedISO])
+    map.setPaintProperty('selected-fill',   'fill-color',   tv.highlight.fill)
+    map.setPaintProperty('selected-fill',   'fill-opacity', 0.45)
+    map.setPaintProperty('selected-border', 'line-color',   tv.highlight.border)
+    map.setPaintProperty('selected-border', 'line-width',   tv.highlight.borderW * 2)
+    // Dim non-selected model countries
+    map.setPaintProperty('model-fill', 'fill-opacity', [
+      'case',
+      ['==', ['get', 'ISO_A3'], selectedISO], 0,
+      ['boolean', ['feature-state', 'hover'], false], 0.35,
+      0.06,
+    ])
+
+    // Zoom to selected country
+    const bounds = computeIsoBounds(selectedISO, geojsonRef.current)
+    if (bounds) map.fitBounds(bounds, { padding: 60, maxZoom: 8, duration: 700 })
+  }, [mapReady, selectedISO, theme]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Basemap switch
   useEffect(() => {
     if (!mapInstance.current) return
-    const map = mapInstance.current
-    if (!map.isStyleLoaded()) return
-    const source = map.getSource('basemap')
-    if (source) source.setTiles([TILES[basemap]])
-  }, [basemap])
+    swapBasemap(mapInstance.current, basemap, theme)
+  }, [basemap, theme])
 
   return (
     <div className="map-panel">
       <div ref={mapRef} className="map-panel-map" />
       <div className="basemap-switcher">
-        {Object.keys(TILES).map(k => (
-          <button
-            key={k}
-            className={`bm-btn${basemap === k ? ' active' : ''}`}
-            onClick={() => setBasemap(k)}
-          >
-            {k}
-          </button>
+        {['minimal','labeled','satellite'].map(k => (
+          <button key={k} className={`bm-btn${basemap === k ? ' active' : ''}`} onClick={() => setBasemap(k)}>{k}</button>
         ))}
       </div>
     </div>

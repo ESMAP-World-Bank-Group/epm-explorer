@@ -1,33 +1,29 @@
 import { useState } from 'react'
-import OverviewTab   from './tabs/OverviewTab'
-import LoadTab       from './tabs/LoadTab'
-import SupplyTab     from './tabs/SupplyTab'
-import ResourcesTab  from './tabs/ResourcesTab'
-import TopologyTab   from './tabs/TopologyTab'
-import AboutTab      from './tabs/AboutTab'
+import OverviewTab  from './tabs/OverviewTab'
+import LoadTab      from './tabs/LoadTab'
+import SupplyTab    from './tabs/SupplyTab'
+import ResourcesTab from './tabs/ResourcesTab'
+import TopologyTab  from './tabs/TopologyTab'
+import AboutTab     from './tabs/AboutTab'
 
 const TABS = [
-  { key: 'overview',  label: 'Overview'       },
-  { key: 'load',      label: 'Load'           },
-  { key: 'supply',    label: 'Supply'         },
-  { key: 'resources', label: 'Resources'      },
-  { key: 'topology',  label: 'Topology'       },
-  { key: 'about',     label: 'About'          },
+  { key: 'overview',  label: 'Overview'  },
+  { key: 'load',      label: 'Load'      },
+  { key: 'supply',    label: 'Supply'    },
+  { key: 'resources', label: 'Resources' },
+  { key: 'topology',  label: 'Topology'  },
+  { key: 'about',     label: 'About'     },
 ]
 
-export default function DataPanel({ branch, model, selectedZone }) {
+export default function DataPanel({ branch, model, selectedZone, selectedISO, isoToZonesMap }) {
   const [active, setActive] = useState('overview')
-  const props = { branch, model, selectedZone }
+  const props = { branch, model, selectedZone, selectedISO, isoToZonesMap }
 
   return (
     <div className="data-panel">
       <div className="tab-bar">
         {TABS.map(t => (
-          <button
-            key={t.key}
-            className={`tab-btn${active === t.key ? ' active' : ''}`}
-            onClick={() => setActive(t.key)}
-          >
+          <button key={t.key} className={`tab-btn${active === t.key ? ' active' : ''}`} onClick={() => setActive(t.key)}>
             {t.label}
           </button>
         ))}
